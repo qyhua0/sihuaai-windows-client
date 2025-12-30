@@ -1,0 +1,29 @@
+﻿<Page x:Class="Bloghua.AutoClient.Desktop.Views.MonitoringView"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:ui="http://schemas.modernwpf.com/2019"
+      Title="运行监控">
+    <StackPanel Margin="20">
+        <TextBlock Text="实时监控控制台" FontSize="24" FontWeight="SemiBold" Margin="0,0,0,20"/>
+
+        <Grid Margin="0,0,0,20">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="当前状态:" VerticalAlignment="Center" FontSize="16"/>
+            <TextBlock x:Name="lblStatus" Text="未运行" Grid.Column="1" Margin="10,0,0,0" 
+                       VerticalAlignment="Center" FontSize="16" FontWeight="Bold" Foreground="Gray"/>
+        </Grid>
+
+        <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
+            <Button x:Name="btnStart" Content="启动服务" Click="Start_Click" Width="120" Margin="0,0,10,0"/>
+            <Button x:Name="btnStop" Content="停止服务" Click="Stop_Click" Width="120" Background="#E81123" Foreground="White"/>
+        </StackPanel>
+
+        <TextBlock Text="实时运行日志" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,10"/>
+        <TextBox x:Name="txtConsole" Height="400" IsReadOnly="True" 
+                 VerticalScrollBarVisibility="Auto" AcceptsReturn="True" 
+                 FontFamily="Consolas"/>
+    </StackPanel>
+</Page>

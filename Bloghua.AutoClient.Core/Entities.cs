@@ -39,4 +39,15 @@ namespace Bloghua.AutoClient.Core.Entities
         public double TimeTakenMs { get; set; }    // API 耗时(毫秒)
         public DateTime CreatedAt { get; set; }    // 创建时间
     }
+
+    // 问答表
+    public class QuestionAnswer
+    {
+        [PrimaryKey, AutoIncrement]
+        public int Id { get; set; }
+        public string Question { get; set; }
+        public string Answer { get; set; }
+        public int Priority { get; set; } = 0; // 优先级，数字越大越优先
+        public string Platform { get; set; }   // 平台
+    }
 }

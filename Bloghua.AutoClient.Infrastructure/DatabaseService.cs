@@ -20,6 +20,8 @@ namespace Bloghua.AutoClient.Infrastructure.Data
             _db.CreateTable<AppSetting>();
             _db.CreateTable<AuthorizedTarget>();
             _db.CreateTable<ChatLog>();
+            _db.CreateTable<QuestionAnswer>();
+
 
             // 初始化默认配置
             InitDefaults();
@@ -32,6 +34,10 @@ namespace Bloghua.AutoClient.Infrastructure.Data
             {
                 SaveSetting("IsAutoSend", "true");
             }
+
+            if (_db.Find<AppSetting>("ScanInterval") == null) SaveSetting("ScanInterval", "6");
+            if (_db.Find<AppSetting>("ReplyWaitMin") == null) SaveSetting("ReplyWaitMin", "2");
+            if (_db.Find<AppSetting>("ReplyWaitMax") == null) SaveSetting("ReplyWaitMax", "20");
         }
 
         // --- 配置相关 ---
@@ -107,5 +113,68 @@ namespace Bloghua.AutoClient.Infrastructure.Data
 
             return query.OrderByDescending(l => l.CreatedAt).ToList();
         }
+
+        public void DeleteLogs(List<int> logIds)
+        {
+            _db.Table<ChatLog>().Where(l => logIds.Contains(l.Id)).Delete();
+        }
+        public void ClearAllLogs()
+        {
+            _db.DeleteAll<ChatLog>();
+        }
+
+
+        // 问答管理 CRUD 
+        public List<QuestionAnswer> SearchQAs(string keyword, string platform)
+        {
+            var query = _db.Table<QuestionAnswer>().Where(q => q.Platform == platform);
+            if (!string.IsNullOrEmpty(keyword))
+            {
+                query = query.Where(q => q.Question.Contains(keyword) || q.Answer.Contains(keyword));
+            }
+            return query.OrderByDescending(q => q.Priority).ToList();
+        }
+        public void SaveQA(QuestionAnswer qa)
+        {
+            if (qa.Id == 0) _db.Insert(qa);
+            else _db.Update(qa);
+        }
+        public void DeleteQA(int id)
+        {
+            _db.Delete<QuestionAnswer>(id);
+        }
+
+        /// <summary>
+        /// 查找最佳匹配的本地问答
+        /// </summary>
+        /// <param name="userMessage">用户发送的消息</param>
+        /// <param name="platform">平台 (WeChat)</param>
+        /// <returns>匹配到的回答，如果没有则返回 null</returns>
+        public string FindBestMatchAnswer(string userMessage, string platform)
+        {
+            if (string.IsNullOrEmpty(userMessage)) return null;
+
+            // 获取该平台下所有问答
+            // 注意：如果数据量特别大(几万条)，建议用 SQL LIKE 查询，但本地几百条数据内存过滤更快且支持更灵活的逻辑
+            var allQAs = _db.Table<QuestionAnswer>()
+                            .Where(q => q.Platform == platform)
+                            .OrderByDescending(q => q.Priority) // 优先匹配高优先级的
+                            .ToList();
+
+            foreach (var qa in allQAs)
+            {
+                // 匹配逻辑：
+                // 1. 如果 QA 的关键词包含在用户消息中 (例如 QA="价格", User="请问价格是多少")
+                // 2. 或者用户消息包含在 QA 问题中 (模糊匹配)
+                //if (userMessage.Contains(qa.Question))
+                if(userMessage.Equals(qa.Question))
+                {
+                    return qa.Answer;
+                }
+            }
+
+            return null;
+        }
+
     }
 }

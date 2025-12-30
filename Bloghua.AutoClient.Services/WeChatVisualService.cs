@@ -8,7 +8,7 @@ using Newtonsoft.Json;
 using Bloghua.AutoClient.Core.Interfaces;
 using Bloghua.AutoClient.Core.Models;
 using Bloghua.AutoClient.Core;
-using Bloghua.AutoClient.Infrastructure.Image; // 引用 VisualHelper
+using Bloghua.AutoClient.Infrastructure.Image; 
 using System.Collections.Concurrent;
 
 using System.Diagnostics; // 用于 Stopwatch
@@ -472,8 +472,8 @@ namespace Bloghua.AutoClient.Services
 
                         if (string.IsNullOrWhiteSpace(msgContent)) return;
 
-                        // 6. 防重与回复 (逻辑不变)
-                        if (IsDuplicateMsg(user.Name, msgContent)) return;
+                    // 6. 防重与回复 (逻辑不变)
+                    if (IsDuplicateMsg(user.Name, msgContent)) return;
 
                         _logger.Log($"[{user.Name}] 捕获完整消息: {msgContent}");
 
@@ -491,22 +491,62 @@ namespace Bloghua.AutoClient.Services
 
                     try
                     {
-                        // B. 调用 API (这里会阻塞 1-3 分钟)
-                        // 注意：此时主程序的 Timer 还在跑，但下一次进来时会被上面的【逻辑1】拦截
-                        string reply = await _api.GetReplyAsync(sessionKey, msgContent,_logger);
+
+
+                        // =========================================================
+                        //  核心逻辑升级：本地优先 + 统一延迟
+                        // =========================================================
+
+                        string replyContent = null;
+                        string replySource = ""; // 用于日志记录来源
+
+                        // 1. 优先查找本地问答库
+                        replyContent = _db.FindBestMatchAnswer(msgContent, "WeChat");
+
+                        if (!string.IsNullOrEmpty(replyContent))
+                        {
+                            replySource = "本地知识库";
+                        }
+                        else
+                        {
+                            // 2. 本地没找到，调用云端 API
+                            _logger.Log("本地未匹配，请求云端 API...");
+                            replySource = "云端API";
+                            replyContent = await _api.GetReplyAsync($"{user.Name}_{user.BusinessId}", msgContent, _logger);
+                        }
+
 
                         sw.Stop();
                         double elapsedMs = sw.Elapsed.TotalMilliseconds/1000;
 
+
+                       
+
                         // 记录到数据库
-                        _db.LogChat(user.Name, "WeChat", msgContent, reply ?? "(API无响应)", elapsedMs);
+                        _db.LogChat(user.Name, "WeChat", msgContent, replyContent ?? "(无回复)", elapsedMs);
+            
+
 
                         // C. 处理回复
-                        if (!string.IsNullOrEmpty(reply))
+                        if (!string.IsNullOrEmpty(replyContent))
                         {
+                       
+
+
+                            // 读取配置：回复等待时间
+                            int minWait = int.Parse(_db.GetSetting("ReplyWaitMin", "2"));
+                            int maxWait = int.Parse(_db.GetSetting("ReplyWaitMax", "20"));
+                            // 在最小等待时间内，随机等待一下，模拟人类思考
+                            if (elapsedMs < minWait * 1000)
+                            {
+                                int delay = new Random().Next((int)(minWait * 1000 - elapsedMs), (int)(maxWait * 1000 - elapsedMs));
+                                await Task.Delay(delay);
+                            }
+
+
                             // 此时界面可能已经变了(用户可能发了新消息)，但我们回复的是针对 msgContent 的
                             // 视觉自动化通常回复完后，用户看到回复自然会继续发问
-                            await SendReply(fullBmp, winRect, reply);
+                            await SendReply(fullBmp, winRect, replyContent);
 
                             // 记录已处理
                             RecordMsg(user.Name, msgContent);

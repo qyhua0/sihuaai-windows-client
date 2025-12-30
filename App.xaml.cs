@@ -1,17 +1,18 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Configuration;
-using System.Data;
-using System.Linq;
-using System.Threading.Tasks;
-using System.Windows;
+﻿using System.Windows;
 
-namespace Bloghua.AutoClient
+namespace Bloghua.AutoClient.Desktop
 {
-    /// <summary>
-    /// App.xaml 的交互逻辑
-    /// </summary>
     public partial class App : Application
     {
+        /*
+        protected override void OnStartup(StartupEventArgs e)
+        {
+            base.OnStartup(e);
+
+            // 手动实例化并显示主窗口
+            // 这样如果类名或命名空间不对，编译时就会直接报错，而不是运行时才崩溃
+            var mainWindow = new MainWindow();
+            mainWindow.Show();
+        }*/
     }
 }

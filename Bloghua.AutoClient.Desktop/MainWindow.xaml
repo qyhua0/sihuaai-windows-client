@@ -1,0 +1,33 @@
+﻿<Window x:Class="Bloghua.AutoClient.Desktop.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:ui="http://schemas.modernwpf.com/2019"
+        mc:Ignorable="d"
+        ui:WindowHelper.UseModernWindowStyle="True"
+        Title="AI 客服助手" Height="700" Width="1100">
+
+    <Grid>
+        <ui:NavigationView x:Name="NavView" 
+                           PaneDisplayMode="Left" 
+                           SelectionChanged="NavView_SelectionChanged"
+                           IsSettingsVisible="False">
+
+            <!-- 1. 菜单项 -->
+            <ui:NavigationView.MenuItems>
+                <!-- 这里不需要额外的列表容器，直接放 Item 即可 -->
+                <ui:NavigationViewItem Content="运行监控" Icon="Play" Tag="Monitoring"/>
+                <ui:NavigationViewItem Content="会话记录" Icon="Comment" Tag="Logs"/>
+                <ui:NavigationViewItem Content="问答管理" Icon="Help" Tag="QA"/>
+                <ui:NavigationViewItem Content="系统设置" Icon="Setting" Tag="Settings"/>
+            </ui:NavigationView.MenuItems>
+
+            <!-- 2. 内容区域 (必须放在 Content 属性中) -->
+            <ui:NavigationView.Content>
+                <Frame x:Name="ContentFrame" NavigationUIVisibility="Hidden"/>
+            </ui:NavigationView.Content>
+
+        </ui:NavigationView>
+    </Grid>
+</Window>

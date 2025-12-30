@@ -33,7 +33,7 @@ namespace Bloghua.AutoClient.Infrastructure.Services
    
 
             OCRModelConfig config = new OCRModelConfig();
-            string root = @"D:\projects\ai2016\c\autoclient\Bloghua.AutoClient\bin\x64\Debug"; //EngineBase.GetRootDirectory();
+            string root = EngineBase.GetRootDirectory();
             string modelPathroot = root + @"\modelx\inference_v3";
             config.det_infer = modelPathroot + @"\ch_PP-OCRv3_det_infer";
             config.cls_infer = modelPathroot + @"\ch_ppocr_mobile_v2.0_cls_infer";
