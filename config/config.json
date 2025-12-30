@@ -1,0 +1,18 @@
+{
+  "AuthorizedUsers": [
+    {
+      "Name": "客户_张三",
+      "BusinessId": "001"
+    },
+    {
+      "Name": "老板",
+      "BusinessId": "999"
+    }
+  ],
+  "AuthorizedGroups": [
+    {
+      "Name": "售后服务群",
+      "BusinessId": "GRP_001"
+    }
+  ]
+}
