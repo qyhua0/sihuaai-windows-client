@@ -1,12 +1,11 @@
-﻿
-
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows;
 using System.Windows.Automation; //需引用 UIAutomationClient 和 UIAutomationTypes
 using Bloghua.AutoClient.Core.Interfaces;
+using System.Windows.Forms;
 
 namespace Bloghua.AutoClient.Infrastructure.Automation
 {
@@ -29,6 +28,12 @@ namespace Bloghua.AutoClient.Infrastructure.Automation
         // 补充需要的 Win32 API 引用
         [DllImport("user32.dll")]
         private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetForegroundWindow();
+
+        [DllImport("user32.dll")]
+        private static extern int GetWindowThreadProcessId(IntPtr hWnd, out int lpdwProcessId);
 
         public bool AttachToWeChat()
         {
@@ -76,9 +81,25 @@ namespace Bloghua.AutoClient.Infrastructure.Automation
 
                             // 3. 【核心修正】强制移动到屏幕 (0,0) 并重置大小为 1000x800
                             // 这样我们可以保证后续的 OCR 坐标绝对准确，不再受上次关闭位置影响
-                            Thread.Sleep(200); // 等待窗口恢复动画
-                            MoveWindow(_hWnd, 0, 0, 1000, 800, true);
-                            Thread.Sleep(200); // 等待重绘
+                           // Thread.Sleep(200); // 等待窗口恢复动画
+                           // MoveWindow(_hWnd, 0, 0, 1000, 800, true);
+                            //Thread.Sleep(200); // 等待重绘
+
+
+
+                            // 获取主屏幕高度
+                            int screenHeight = Screen.PrimaryScreen.Bounds.Height;
+
+                            int targetX = 0;              // 靠左
+                            int targetY = 90;             // 距上 90px
+                            int targetW = 1000;           // 宽度保持 1000 不变(保证OCR布局)
+                            int targetH = screenHeight - 180; // 高度 = 总高 - 上90 - 下90
+
+                            Thread.Sleep(200);
+                            MoveWindow(_hWnd, targetX, targetY, targetW, targetH, true);
+                            Thread.Sleep(200);
+
+
 
 
                             try
@@ -106,12 +127,14 @@ namespace Bloghua.AutoClient.Infrastructure.Automation
 
         public Rect GetWindowBounds()
         {
-            if (_weChatWindow == null) AttachToWeChat();
-           // return _weChatWindow.Current.BoundingRectangle;
-
-            // 要强制重置，所以直接返回我们设定的标准尺寸即可
-            // 实际截图时会截取 0,0,1000,800 的屏幕区域
-            return new Rect(0, 0, 1000, 800);
+            // 获取实际位置，而不是写死
+            if (_weChatWindow != null)
+            {
+                try { return _weChatWindow.Current.BoundingRectangle; } catch { }
+            }
+            // 兜底返回计算值
+            int h = Screen.PrimaryScreen.Bounds.Height - 180;
+            return new Rect(0, 90, 1000, h);
         }
 
 
@@ -122,5 +145,37 @@ namespace Bloghua.AutoClient.Infrastructure.Automation
                 MoveWindow(_hWnd, 0, 0, width, height, true);
             }
         }
+
+        public void MoveWindow(int x, int y, int width, int height)
+        {
+            if (_hWnd != IntPtr.Zero)
+            {
+                MoveWindow(_hWnd, x, y, width, height, true);
+            }
+        }
+
+        /// <summary>
+        /// 快速检查微信窗口是否处于激活状态且有效
+        /// </summary>
+        public bool IsWeChatActive()
+        {
+            if (_hWnd == IntPtr.Zero) return false;
+
+            // 1. 检查句柄是否还且有效
+            // IsWindow 是 user32.dll 的 API，需引入
+            if (!IsWindow(_hWnd)) return false;
+
+            // 2. 检查当前前台窗口是不是微信
+            // 如果用户切换了窗口，或者微信崩了，前台窗口就不是它了
+            IntPtr foregroundWnd = GetForegroundWindow();
+            if (foregroundWnd != _hWnd) return false;
+
+            return true;
+        }
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool IsWindow(IntPtr hWnd);
+
     }
 }

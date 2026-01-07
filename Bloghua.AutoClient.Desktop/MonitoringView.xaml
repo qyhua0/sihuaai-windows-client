@@ -3,8 +3,64 @@
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       xmlns:ui="http://schemas.modernwpf.com/2019"
       Title="运行监控">
+    
+    
+    
+    
     <StackPanel Margin="20">
         <TextBlock Text="实时监控控制台" FontSize="24" FontWeight="SemiBold" Margin="0,0,0,20"/>
+
+        <!-- ============================================== -->
+        <!-- 新增：状态流程指示灯 -->
+        <!-- ============================================== -->
+       <Border Background="#F2F2F2" CornerRadius="8" Padding="20" Margin="0,0,0,30">
+
+                <StackPanel>
+                <TextBlock Text="工作流状态" FontWeight="Bold" Margin="0,0,0,15" Opacity="0.6"/>
+
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="1*"/>
+                        <!-- 获取 -->
+                        <ColumnDefinition Width="50"/>
+                        <!-- 箭头 -->
+                        <ColumnDefinition Width="1*"/>
+                        <!-- 处理 -->
+                        <ColumnDefinition Width="50"/>
+                        <!-- 箭头 -->
+                        <ColumnDefinition Width="1*"/>
+                        <!-- 发送 -->
+                    </Grid.ColumnDefinitions>
+
+                    <!-- 1. 获取消息 -->
+                    <StackPanel Grid.Column="0" HorizontalAlignment="Center">
+                        <Ellipse x:Name="lightScan" Width="20" Height="20" Fill="#E0E0E0" Margin="0,0,0,10"/>
+                        <TextBlock Text="获取消息" HorizontalAlignment="Center" FontWeight="SemiBold"/>
+                        <TextBlock Text="OCR / 扫描" HorizontalAlignment="Center" FontSize="12" Foreground="Gray"/>
+                    </StackPanel>
+
+                    <!-- 箭头 -->
+                    <ui:FontIcon Grid.Column="1" Glyph="&#xE76C;" FontSize="20" Foreground="Gray" VerticalAlignment="Top" Margin="0,2,0,0"/>
+
+                    <!-- 2. 处理消息 -->
+                    <StackPanel Grid.Column="2" HorizontalAlignment="Center">
+                        <Ellipse x:Name="lightProcess" Width="20" Height="20" Fill="#E0E0E0" Margin="0,0,0,10"/>
+                        <TextBlock Text="智能处理" HorizontalAlignment="Center" FontWeight="SemiBold"/>
+                        <TextBlock Text="API / 本地库" HorizontalAlignment="Center" FontSize="12" Foreground="Gray"/>
+                    </StackPanel>
+
+                    <!-- 箭头 -->
+                    <ui:FontIcon Grid.Column="3" Glyph="&#xE76C;" FontSize="20" Foreground="Gray" VerticalAlignment="Top" Margin="0,2,0,0"/>
+
+                    <!-- 3. 回复消息 -->
+                    <StackPanel Grid.Column="4" HorizontalAlignment="Center">
+                        <Ellipse x:Name="lightSend" Width="20" Height="20" Fill="#E0E0E0" Margin="0,0,0,10"/>
+                        <TextBlock Text="执行回复" HorizontalAlignment="Center" FontWeight="SemiBold"/>
+                        <TextBlock Text="模拟输入" HorizontalAlignment="Center" FontSize="12" Foreground="Gray"/>
+                    </StackPanel>
+                </Grid>
+            </StackPanel>
+        </Border>
 
         <Grid Margin="0,0,0,20">
             <Grid.ColumnDefinitions>

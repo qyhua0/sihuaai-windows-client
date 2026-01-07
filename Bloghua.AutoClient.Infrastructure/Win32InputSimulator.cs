@@ -4,6 +4,7 @@ using System.Threading;
 using System.Drawing; // 用于 Point
 using Bloghua.AutoClient.Core.Interfaces;
 using Bloghua.AutoClient.Core;
+using System.Windows.Forms; // 需要引用 System.Windows.Forms (用于 SendKeys)
 
 namespace Bloghua.AutoClient.Infrastructure.Input
 {
@@ -22,6 +23,12 @@ namespace Bloghua.AutoClient.Infrastructure.Input
         private const int MOUSEEVENTF_LEFTDOWN = 0x0002;
         private const int MOUSEEVENTF_LEFTUP = 0x0004;
         private const int MOUSEEVENTF_ABSOLUTE = 0x8000;
+
+        private const int MOUSEEVENTF_RIGHTDOWN = 0x0008;
+        private const int MOUSEEVENTF_RIGHTUP = 0x0010;
+        private const int MOUSEEVENTF_WHEEL = 0x0800;
+
+
 
         /// <summary>
         /// 模拟一次标准的鼠标左键单击
@@ -67,6 +74,34 @@ namespace Bloghua.AutoClient.Infrastructure.Input
         public void SendEnter()
         {
             System.Windows.Forms.SendKeys.SendWait("{ENTER}");
+        }
+
+        // 右键点击
+        public void RightClick(int x, int y)
+        {
+            SetCursorPos(x, y);
+            Thread.Sleep(150); // 停顿，防止惯性
+            mouse_event(MOUSEEVENTF_RIGHTDOWN, 0, 0, 0, 0);
+            Thread.Sleep(10);
+            mouse_event(MOUSEEVENTF_RIGHTUP, 0, 0, 0, 0);
+            Thread.Sleep(500); // 右键菜单弹出需要时间，多等一会儿
+        }
+
+        // 模拟按键 (用于按 ESC 关闭菜单)
+        public void SendKey(string key)
+        {
+            SendKeys.SendWait(key);
+            Thread.Sleep(100);
+        }
+
+        // 实现滚轮方法
+        public void ScrollMouseWheel(int delta)
+        {
+            // delta > 0: 向上滚
+            // delta < 0: 向下滚
+            // -120 约等于一次标准的滚轮“咔嗒”
+            mouse_event(MOUSEEVENTF_WHEEL, 0, 0, delta, 0);
+            Thread.Sleep(200); // 滚动后等待UI响应
         }
     }
 }

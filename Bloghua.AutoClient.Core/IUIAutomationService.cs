@@ -12,5 +12,8 @@ namespace Bloghua.AutoClient.Core.Interfaces
 
         // 3. 强制调整窗口大小 (确保OCR和截图坐标稳定)
         void ResizeWindow(int width, int height);
+
+        void MoveWindow(int x, int y, int width, int height);
+        bool IsWeChatActive();
     }
 }

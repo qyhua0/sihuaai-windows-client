@@ -444,7 +444,7 @@ namespace Bloghua.AutoClient.Infrastructure.Image
             if (w < 5 || h < 5) return null;
 
             // 为了 OCR 更准，四周留一点白边 padding
-            int padding = 5;
+            int padding = 2;
             return new BubbleResult
             {
                 Rect = new Rectangle(
@@ -455,6 +455,154 @@ namespace Bloghua.AutoClient.Infrastructure.Image
                 ),
                 Type = foundType
             };
+        }
+
+
+        /// <summary>
+        /// 检测指定区域是否包含明显的绿色 (用于判断微信Tab状态)
+        /// </summary>
+        public static bool HasGreenColor(Bitmap bmp, Rectangle rect)
+        {
+            // 边界校验
+            if (rect.X < 0) rect.X = 0;
+            if (rect.Y < 0) rect.Y = 0;
+            if (rect.Right > bmp.Width) rect.Width = bmp.Width - rect.X;
+            if (rect.Bottom > bmp.Height) rect.Height = bmp.Height - rect.Y;
+
+            BitmapData bmpData = bmp.LockBits(rect, ImageLockMode.ReadOnly, bmp.PixelFormat);
+            int stride = Math.Abs(bmpData.Stride);
+            int pixelSize = (bmp.PixelFormat == PixelFormat.Format24bppRgb) ? 3 : 4;
+
+            bool hasGreen = false;
+
+            unsafe
+            {
+                byte* ptr = (byte*)bmpData.Scan0;
+                int rows = rect.Height;
+                int cols = rect.Width;
+
+                // 为了性能，跳跃扫描
+                for (int y = 0; y < rows; y += 2)
+                {
+                    for (int x = 0; x < cols; x += 2)
+                    {
+                        int index = (y * stride) + (x * pixelSize);
+                        byte b = ptr[index];
+                        byte g = ptr[index + 1];
+                        byte r = ptr[index + 2];
+
+                        // 微信绿特征: R=7, G=193, B=96
+                        // 宽泛判定: G 分量明显大于 R 和 B，且 G 足够亮
+                        if (g > 140 && g > r + 40 && g > b + 40)
+                        {
+                            hasGreen = true;
+                            break;
+                        }
+                    }
+                    if (hasGreen) break;
+                }
+            }
+
+            bmp.UnlockBits(bmpData);
+            return hasGreen;
+        }
+
+
+        /// <summary>
+        /// 判断气泡内容是否为纯文本 (改进版：基于饱和度和边缘检测)
+        /// </summary>
+        public static bool IsTextBubble(Bitmap bmp)
+        {
+            // 1. 尺寸防御：太小的图（如标点符号）直接算文本
+            if (bmp.Width < 20 || bmp.Height < 20) return true;
+
+            Rectangle rect = new Rectangle(0, 0, bmp.Width, bmp.Height);
+            BitmapData bmpData = bmp.LockBits(rect, ImageLockMode.ReadOnly, bmp.PixelFormat);
+            int stride = Math.Abs(bmpData.Stride);
+            int pixelSize = (bmp.PixelFormat == PixelFormat.Format24bppRgb) ? 3 : 4;
+
+            int colorPixelCount = 0; // 彩色像素数
+            int totalPixels = 0;
+
+            // 记录边缘行的白色情况
+            int topRowsWhiteCount = 0;
+            int bottomRowsWhiteCount = 0;
+            int marginCheckHeight = 5; // 检查上下各 5 像素的高度
+
+            unsafe
+            {
+                byte* ptr = (byte*)bmpData.Scan0;
+
+                for (int y = 0; y < bmp.Height; y++)
+                {
+                    bool isTopMargin = y < marginCheckHeight;
+                    bool isBottomMargin = y >= bmp.Height - marginCheckHeight;
+
+                    for (int x = 0; x < bmp.Width; x++)
+                    {
+                        int index = (y * stride) + (x * pixelSize);
+                        byte b = ptr[index];
+                        byte g = ptr[index + 1];
+                        byte r = ptr[index + 2];
+
+                        // ==========================================
+                        // 逻辑 A: 颜色饱和度检测
+                        // ==========================================
+                        // 计算 RGB 的最大差值。如果差值大，说明是彩色。
+                        // 黑、白、灰的 RGB 差值通常 < 10
+                        int maxDiff = Math.Max(Math.Abs(r - g), Math.Max(Math.Abs(r - b), Math.Abs(g - b)));
+
+                        // 如果差值 > 20，认为是“彩色像素”
+                        if (maxDiff > 20)
+                        {
+                            colorPixelCount++;
+                        }
+
+                        totalPixels++;
+
+                        // ==========================================
+                        // 逻辑 B: 边缘纯净度检测 (检查是不是白底)
+                        // ==========================================
+                        // 宽松的白色定义：亮度 > 230 且是灰阶
+                        bool isWhiteish = (r > 230 && g > 230 && b > 230) && (maxDiff < 15);
+
+                        if (isWhiteish)
+                        {
+                            if (isTopMargin) topRowsWhiteCount++;
+                            if (isBottomMargin) bottomRowsWhiteCount++;
+                        }
+                    }
+                }
+            }
+            bmp.UnlockBits(bmpData);
+
+            // ==========================================
+            // 综合判定
+            // ==========================================
+
+            // 1. 彩色判定：如果彩色像素占比超过 5%，肯定是图片/表情包
+            // (文本只有黑白灰，彩色占比应该是 0%)
+            double colorRatio = (double)colorPixelCount / totalPixels;
+            if (colorRatio > 0.05)
+            {
+                // System.Diagnostics.Debug.WriteLine($"判定为图片：彩色像素占比 {colorRatio:P1}");
+                return false;
+            }
+
+            // 2. 边缘判定：文本气泡上下边缘必须是白色的
+            // 如果顶部或底部的 5 行里，白色像素少于 50%，说明图片撑满了边缘，不是文本
+            int totalMarginPixels = bmp.Width * marginCheckHeight;
+            double topWhiteRatio = (double)topRowsWhiteCount / totalMarginPixels;
+            double bottomWhiteRatio = (double)bottomRowsWhiteCount / totalMarginPixels;
+
+            if (topWhiteRatio < 0.5 || bottomWhiteRatio < 0.5)
+            {
+                // System.Diagnostics.Debug.WriteLine($"判定为图片：边缘白色占比过低 Top:{topWhiteRatio:P1} Bottom:{bottomWhiteRatio:P1}");
+                return false;
+            }
+
+            // 通过所有检查，认为是文本
+            return true;
         }
     }
 }

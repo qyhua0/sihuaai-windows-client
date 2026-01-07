@@ -14,6 +14,12 @@ using System.Collections.Concurrent;
 using System.Diagnostics; // 用于 Stopwatch
 using Bloghua.AutoClient.Infrastructure.Data; // 引用数据库服务
 using Bloghua.AutoClient.Core.Entities;
+using Bloghua.AutoClient.Core.Enums; // 引用枚举
+using Bloghua.AutoClient.Infrastructure.Services;
+using System.Windows;
+using System.Collections.Generic; // 用于 HashSet
+
+
 
 namespace Bloghua.AutoClient.Services
 {
@@ -26,10 +32,12 @@ namespace Bloghua.AutoClient.Services
         private readonly ILoggerService _logger;
         private readonly ChatApiService _api;
        // private AppConfig _config;
-        private readonly DatabaseService _db; 
+        private readonly DatabaseService _db;
+        private readonly StickerService _stickerService; // 新增
 
 
-        // 【新增】用户忙碌状态锁
+
+        // 用户忙碌状态锁
         // Key: 用户名_业务ID (SessionKey), Value: 是否正在处理中
         private static ConcurrentDictionary<string, bool> _processingFlags = new ConcurrentDictionary<string, bool>();
 
@@ -53,13 +61,14 @@ namespace Bloghua.AutoClient.Services
             IInputSimulator input,
             IImageLocator cv,
             ILoggerService logger,
-            DatabaseService db)
+            DatabaseService db, StickerService stickerService)
         {
             _uia = uia; _ocr = ocr; _input = input; _cv = cv; _logger = logger;
             _api = new ChatApiService();
 
             _db = db;
-           // LoadConfig();
+            _stickerService = stickerService ?? new StickerService();
+            // LoadConfig();
 
         }
 
@@ -78,26 +87,77 @@ namespace Bloghua.AutoClient.Services
 
         }*/
 
-    
+        // 状态变更事件
+        public event Action<WorkStatus> OnStatusChanged;
+
+        // 辅助方法：触发状态
+        private void SetStatus(WorkStatus status)
+        {
+            OnStatusChanged?.Invoke(status);
+        }
+
+
+       
+
+       
+
 
         public async Task RunCycleAsync()
         {
             try
             {
-                if (!_uia.AttachToWeChat()) return;
+                // 设置状态为扫描中
+                SetStatus(WorkStatus.Scanning);
+
+                if (!_uia.AttachToWeChat())
+                {
+                    SetStatus(WorkStatus.Idle);
+                    return;
+                }
+
+                // 等待一下窗口刷新
+                await Task.Delay(100);
+
+                // 获取窗口位置
                 var winRect = _uia.GetWindowBounds();
 
                 // 1. 获取原始全屏截图
                 using (Bitmap fullWindow = CaptureScreen(winRect))
                 {
-                    // 2. 【关键】动态寻找分割线 X 坐标
-                    int splitX = VisualHelper.FindVerticalSplitLine(fullWindow);
-                    _logger.Log($"检测到分割线位置: X={splitX}");
+                    // ========================================================
+                    // 检查左侧 "聊天" 图标是否被选中 (保留您调试好的坐标)
+                    // ========================================================
+                    Rectangle sidebarRect = new Rectangle(26, 95, 3, 3);
 
-                    // 3. 截取“纯净”的标题区 (分割线右侧，顶部)
-                    // 标题通常在分割线右侧 + 20px 开始
+                    bool isChatTabSelected = VisualHelper.HasGreenColor(fullWindow, sidebarRect);
+
+                    if (!isChatTabSelected)
+                    {
+                        _logger.Log("检测到 [聊天] 图标未选中，执行点击归位。");
+
+                        // 点击侧边栏第一个图标
+                        int chatIconX = (int)winRect.X + 26;
+                        int chatIconY = (int)winRect.Y + 95;
+
+                        _input.Click(chatIconX, chatIconY);
+                        _input.Click((int)winRect.X + 900, (int)winRect.Y + 750); // 移开鼠标
+
+                        // 点击后直接返回，等待下一轮
+                        return;
+                    }
+
+                    // ========================================================
+                    // 正常的业务流程
+                    // ========================================================
+
+                    // 2. 动态寻找分割线
+                    int splitX = VisualHelper.FindVerticalSplitLine(fullWindow);
+                    // _logger.Log($"检测到分割线位置: X={splitX}");
+
+                    // 3. 截取标题区
+                    // 注意：这里的坐标如果之前测试准确，请保持；如果标题太长被切，可适当加宽
                     Rectangle rectTitle = new Rectangle(splitX + 10, 0, fullWindow.Width - splitX - 200, 60);
-                    string currentTitle = await CropAndOcr(fullWindow, rectTitle, false); // false=不需要滤镜
+                    string currentTitle = await CropAndOcr(fullWindow, rectTitle, false);
 
                     _logger.Log($"当前标题: {currentTitle}");
 
@@ -106,14 +166,47 @@ namespace Bloghua.AutoClient.Services
 
                     if (activeUser != null)
                     {
-                        // === 情况 A: 已在房间，只读分割线右侧的消息 ===
+                        // === 情况 A: 已在房间，只读消息 ===
                         await ProcessChatContent(fullWindow, winRect, splitX, activeUser);
                     }
                     else
                     {
-                        // === 情况 B: 不在房间，扫描左侧列表 ===
-                        // 传入 splitX，确保只扫描分割线左侧
-                        await ScanUserListAndClick(fullWindow, winRect, splitX);
+                        // === 情况 B: 不在房间，执行【滚动扫描】 ===
+                        // 替换掉了原来的 ScanUserListAndClick
+
+                        _logger.Log("当前窗口非目标，开始滚动扫描列表...");
+
+                        // 调用滚动扫描方法，获取所有可见用户
+                        var allVisibleUsers = await ScanFullUserListWithScrolling(winRect, splitX);
+
+                        // 从数据库获取需要处理的目标
+                        var targetsToServe = _db.GetActiveTargets("WeChat");
+
+                        // 在扫描结果中寻找匹配项
+                        foreach (var dbUser in targetsToServe)
+                        {
+                            // 查找 OCR 结果中是否包含数据库里的名字
+                            var foundMatch = allVisibleUsers.FirstOrDefault(kvp => kvp.Key.Contains(dbUser.Name));
+
+                            if (!string.IsNullOrEmpty(foundMatch.Key))
+                            {
+                                _logger.Log($"在列表中找到目标 [{dbUser.Name}]，执行点击。");
+
+                                var userRect = foundMatch.Value.Rect; // 这是屏幕绝对坐标(已在Scan方法里转换)
+
+                                // 点击中心点
+                                int clickX = userRect.X + userRect.Width / 2;
+                                int clickY = userRect.Y + userRect.Height / 2;
+
+                                _input.Click(clickX, clickY);
+                                _input.Click((int)winRect.X + 900, (int)winRect.Y + 750); // 移开鼠标
+
+                                // 点击后立刻返回，等待下个周期
+                                return;
+                            }
+                        }
+
+                        _logger.Log("本轮扫描未找到任何待处理的目标用户。");
                     }
                 }
             }
@@ -121,9 +214,13 @@ namespace Bloghua.AutoClient.Services
             {
                 _logger.Error("循环异常", ex);
             }
+            finally
+            {
+                SetStatus(WorkStatus.Idle);
+            }
         }
 
-        
+
 
         // 扫描好友列表 (左侧)
         private async Task ScanUserListAndClick(Bitmap fullBmp, System.Windows.Rect winRect, int splitX)
@@ -300,12 +397,12 @@ namespace Bloghua.AutoClient.Services
 
         // ================= Helpers =================
 
-        private Point GetCenter(Rectangle r)
+        private System.Drawing.Point GetCenter(Rectangle r)
         {
-            return new Point(r.X + r.Width / 2, r.Y + r.Height / 2);
+            return new System.Drawing.Point(r.X + r.Width / 2, r.Y + r.Height / 2);
         }
 
-        private bool IsPointInZone(Point p, int minX, int maxX)
+        private bool IsPointInZone(System.Drawing.Point p, int minX, int maxX)
         {
             return p.X >= minX && p.X <= maxX;
         }
@@ -438,7 +535,7 @@ namespace Bloghua.AutoClient.Services
 
           
                     // 调试：保存整个消息区
-                    // msgAreaBmp.Save("debug_chat_area.png");
+                  // msgAreaBmp.Save("debug_chat_area.png");
 
                     // 2. 【核心】寻找最后一个气泡
                     var bubble = VisualHelper.FindLastBubble(msgAreaBmp);
@@ -456,16 +553,89 @@ namespace Bloghua.AutoClient.Services
                         return;
                     }
 
-                    // 4. 裁剪出气泡内容 (对方发的白色气泡)
-                    // 注意：bubble.Rect 是相对于 msgAreaBmp 的坐标
-                    using (Bitmap bubbleBmp = msgAreaBmp.Clone(bubble.Rect, msgAreaBmp.PixelFormat))
+                Rectangle bubbleRelRect = bubble.Rect; // 相对气泡图
+                int bubbleCenterX = (int)(winRect.X + rectMsg.X + bubbleRelRect.X + bubbleRelRect.Width / 2);
+                int bubbleCenterY = (int)(winRect.Y + rectMsg.Y + bubbleRelRect.Y + bubbleRelRect.Height / 2);
+
+
+                // 4. 裁剪出气泡内容 (对方发的白色气泡)
+                // 注意：bubble.Rect 是相对于 msgAreaBmp 的坐标
+                using (Bitmap bubbleBmp = msgAreaBmp.Clone(bubble.Rect, msgAreaBmp.PixelFormat))
                     {
                         // 调试：保存气泡图 (这张图就是纯白背景+黑字，OCR 识别率极高)
                         string bubblePath = "debug_last_bubble.png";
                         bubbleBmp.Save(bubblePath);
 
-                        // 5. OCR 识别
-                        string msgContent = await _ocr.RecognizeTextAsync(bubbleBmp);
+
+
+
+                    // =========================================================
+                    // 图片/表情包过滤
+                    // =========================================================
+                    string msgContent = "";
+                    bool isImage = false;
+
+                    // =========================================================
+                    // 【核心升级】类型判定策略
+                    // =========================================================
+
+                    // 策略 A: 先看是不是明显的非文本（比如五颜六色的图）
+                    if (!VisualHelper.IsTextBubble(bubbleBmp))
+                    {
+                        isImage = true; // 肯定是图片
+                    }
+                    else
+                    {
+                        // 策略 B: 即便是白底，也可能是表情包 (如“微笑”)
+                        // 此时调用 "右键菜单法" 进行最终裁决
+                        _logger.Log("检测到白底内容，执行 [右键验身]...");
+
+                        bool hasSaveOption = CheckIfImageByRightClick(bubbleCenterX, bubbleCenterY);
+
+                        if (hasSaveOption)
+                        {
+                            isImage = true;
+                        }
+                    }
+
+                    // =========================================================
+                    // 【分支处理】
+                    // =========================================================
+
+                    if (isImage)
+                    {
+                        // 尝试匹配本地表情库
+                        string stickerMeaning = _stickerService.MatchSticker(bubbleBmp);
+
+                        if (!string.IsNullOrEmpty(stickerMeaning))
+                        {
+                            msgContent = stickerMeaning; // 匹配成功！如 "[微笑]"
+                            _logger.Log($"表情包匹配成功: {msgContent}");
+                        }
+                        else
+                        {
+                            _logger.Log("检测到未知图片/表情，准备调用多模态 API (功能待实现)");
+                            // TODO: 这里将来调用 api/ocr 或 api/analyze_image
+                            // 目前暂且跳过，或标记为 [图片]
+                            msgContent = "[图片]";
+
+                            // 临时策略：如果是未知的 [图片]，目前先不回，防止乱回
+                            return;
+                        }
+                    }
+                    else
+                    {
+                        // 是纯文本，执行 OCR
+                        msgContent = await _ocr.RecognizeTextAsync(bubbleBmp);
+                    }
+
+
+
+
+
+
+                    // 5. OCR 识别
+                   // string msgContent = await _ocr.RecognizeTextAsync(bubbleBmp);
 
                         // 清洗内容 (去除空行)
                         msgContent = msgContent?.Trim();
@@ -477,8 +647,11 @@ namespace Bloghua.AutoClient.Services
 
                         _logger.Log($"[{user.Name}] 捕获完整消息: {msgContent}");
 
-                    _logger.Log($"[{user.Name}] 捕获新消息，准备请求 API...");
+             
 
+
+                    // 状态：开始处理 (亮起第二个灯)
+                    SetStatus(WorkStatus.Processing);
                     // =======================================================
                     // 【关键逻辑 2】开始处理流程
                     // =======================================================
@@ -506,11 +679,13 @@ namespace Bloghua.AutoClient.Services
                         if (!string.IsNullOrEmpty(replyContent))
                         {
                             replySource = "本地知识库";
+                            _logger.Log("本地匹配，使用规则知识库");
                         }
                         else
                         {
+                            _logger.Log($"[{user.Name}] 捕获新消息，准备请求 API...");
                             // 2. 本地没找到，调用云端 API
-                            _logger.Log("本地未匹配，请求云端 API...");
+                         
                             replySource = "云端API";
                             replyContent = await _api.GetReplyAsync($"{user.Name}_{user.BusinessId}", msgContent, _logger);
                         }
@@ -543,7 +718,8 @@ namespace Bloghua.AutoClient.Services
                                 await Task.Delay(delay);
                             }
 
-
+                            // 状态：开始发送 (亮起第三个灯)
+                            SetStatus(WorkStatus.Sending);
                             // 此时界面可能已经变了(用户可能发了新消息)，但我们回复的是针对 msgContent 的
                             // 视觉自动化通常回复完后，用户看到回复自然会继续发问
                             await SendReply(fullBmp, winRect, replyContent);
@@ -595,5 +771,202 @@ namespace Bloghua.AutoClient.Services
             }
             return lines.LastOrDefault(); // 兜底
         }
+
+
+        /// <summary>
+        /// 【核心黑科技】通过右键菜单判断是文本还是图片
+        /// </summary>
+        private bool CheckIfImageByRightClick(int x, int y)
+        {
+            // 1. 右键点击气泡中心
+            _input.RightClick(x, y);
+
+            // 2. 截取鼠标附近的菜单区域
+            // 右键菜单通常出现在鼠标右下方，截一个 200x300 的图足够覆盖菜单了
+            // 注意：要确保不越界
+            int screenW = (int)SystemParameters.PrimaryScreenWidth;
+            int screenH = (int)SystemParameters.PrimaryScreenHeight;
+
+            int menuW = 200;
+            int menuH = 300;
+            if (x + menuW > screenW) x = x - menuW; // 如果靠右边缘，菜单会往左弹
+            if (y + menuH > screenH) y = y - menuH;
+
+            // 稍微偏移一点截取，避开鼠标指针本身
+            Rectangle menuRect = new Rectangle(x + 20, y + 20, menuW - 10, menuH - 10);
+
+            bool isImage = false;
+
+            using (Bitmap menuBmp = CaptureScreen(new Rect(menuRect.X, menuRect.Y, menuRect.Width, menuRect.Height)))
+            {
+                // 3. OCR 识别菜单文字
+                // 菜单对比度很高，PaddleOCR 识别非常准
+                string menuText = _ocr.RecognizeTextAsync(menuBmp).Result; // 同步调用即可
+
+                // 4. 关键词判断
+                // 图片/表情包特征: "另存为", "添加", "表情"
+                // 文本特征: "复制", "搜一搜" (文本也有复制，但图片通常有另存为)
+
+                if (menuText.Contains("另存为") || menuText.Contains("添加") || menuText.Contains("表情"))
+                {
+                    isImage = true;
+                }
+
+                // 调试日志
+                // _logger.Log($"右键菜单识别: {menuText.Replace("\n", " ")} => {(isImage ? "图片" : "文本")}");
+            }
+
+            // 5. 【非常重要】关闭菜单
+            // 模拟按下 ESC 键
+            _input.SendKey("{ESC}");
+
+            // 等待菜单消失
+            System.Threading.Thread.Sleep(200);
+
+            return isImage;
+        }
+
+
+
+        private async Task<Dictionary<string, OcrResultItem>> ScanFullUserListWithScrolling(System.Windows.Rect winRect, int splitX)
+        {
+            var allFoundUsers = new Dictionary<string, OcrResultItem>();
+            var processedNames = new HashSet<string>();
+
+            // =========================================================
+            // 1. 【安全检查】启动前确认窗口状态
+            // =========================================================
+            if (!_uia.IsWeChatActive())
+            {
+                _logger.Log("⚠️ 警告：微信窗口失去焦点或已退出，停止扫描。");
+                return allFoundUsers;
+            }
+
+            // =========================================================
+            // 2. 归位逻辑 (回到顶部)
+            // =========================================================
+            int listX = 60;
+            int listW = splitX - listX;
+            if (listW < 50) listW = 200;
+
+            // 移动鼠标到列表区
+            int hoverX = (int)winRect.X + listX + listW / 2;
+            int hoverY = (int)winRect.Y + 300;
+
+            // 【安全点击】
+            if (!_uia.IsWeChatActive()) return allFoundUsers;
+            _input.Click(hoverX, hoverY);
+
+            // 向上滚动归位
+            for (int k = 0; k < 5; k++)
+            {
+                // 【熔断】每次动作前检查
+                if (!_uia.IsWeChatActive()) break;
+
+                // 减小力度，防止极速滚动触发风控
+                _input.ScrollMouseWheel(300);
+                await Task.Delay(100); // 增加间隔
+            }
+            await Task.Delay(800);
+
+            // =========================================================
+            // 3. 扫描循环
+            // =========================================================
+            int maxScrolls = 15;
+
+            for (int i = 0; i < maxScrolls; i++)
+            {
+                // 【熔断】截图前检查
+                if (!_uia.IsWeChatActive())
+                {
+                    _logger.Log("⚠️ 扫描中途窗口丢失，紧急停止。");
+                    break;
+                }
+
+                // 重新截取当前屏幕
+                using (Bitmap currentFrameBmp = CaptureScreen(winRect))
+                {
+                    Rectangle rectList = new Rectangle(listX, 60, listW, currentFrameBmp.Height - 60);
+
+                    using (Bitmap listBmp = currentFrameBmp.Clone(rectList, currentFrameBmp.PixelFormat))
+                    using (Bitmap filteredListBmp = VisualHelper.KeepDarkTextOnly(listBmp))
+                    {
+                        var ocrResults = _ocr.DetectText(filteredListBmp);
+                        bool hasNewUserInThisPage = false;
+
+                        if (ocrResults != null)
+                        {
+                            foreach (var item in ocrResults)
+                            {
+                                string name = item.Text.Trim();
+                                if (name.Length < 1) continue;
+                                if (IsSystemEntry(name)) continue;
+
+                                if (processedNames.Add(name))
+                                {
+                                    hasNewUserInThisPage = true;
+                                    int absX = (int)winRect.X + listX + item.Rect.X;
+                                    int absY = (int)winRect.Y + 60 + item.Rect.Y;
+                                    var screenRect = new Rectangle(absX, absY, item.Rect.Width, item.Rect.Height);
+
+                                    allFoundUsers[name] = new OcrResultItem { Text = name, Rect = screenRect };
+                                }
+                            }
+                        }
+
+                        if (!hasNewUserInThisPage && i > 0)
+                        {
+                            _logger.Log("列表扫描结束 (到达底部)。");
+                            break;
+                        }
+                    }
+                }
+
+                // 【熔断】滚动前检查
+                if (!_uia.IsWeChatActive()) break;
+
+                // 确保鼠标还在列表区 (防止用户移走鼠标导致滚错地方)
+                _input.Click(hoverX, hoverY);
+
+                // 向下滚动
+                _input.ScrollMouseWheel(-300);
+
+                // 【关键】增加随机等待，模拟人类，减少崩溃概率
+                // 机器滚太快会导致微信UI线程死锁
+                int randomDelay = new Random().Next(600, 900);
+                await Task.Delay(randomDelay);
+            }
+
+            return allFoundUsers;
+        }
+
+        /// <summary>
+        /// 判断是否为微信的系统文件夹入口（点击会改变列表结构的特殊项）
+        /// </summary>
+        private bool IsSystemEntry(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return false;
+
+            // 常见的系统入口名称
+            string[] blackList = new[]
+            {
+                "服务号",
+                "客服消息",
+                "服务通知",
+                "订阅号消息",
+                "订阅号",
+                "文件传输助手",
+                "微信团队"
+            };
+
+            foreach (var key in blackList)
+            {
+                if (name.Contains(key)) return true;
+            }
+            return false;
+        }
+
+
+
     }
 }

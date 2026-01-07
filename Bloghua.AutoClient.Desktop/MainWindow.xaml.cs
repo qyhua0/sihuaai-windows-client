@@ -37,6 +37,35 @@ namespace Bloghua.AutoClient.Desktop
             {
                 MessageBox.Show($"初始化失败: {ex.Message}");
             }
+
+
+            // 监听加载完成事件，设置窗口位置
+            this.Loaded += MainWindow_Loaded;
+
+            try
+            {
+                ServiceLocator.Db = new DatabaseService();
+                ServiceLocator.Logger = new FileLoggerService();
+                NavView.SelectedItem = NavView.MenuItems[0];
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"初始化失败: {ex.Message}");
+            }
+        }
+
+        // 设置主窗口位置：屏幕右下角
+        private void MainWindow_Loaded(object sender, RoutedEventArgs e)
+        {
+            // 获取屏幕工作区 (排除任务栏)
+            var workArea = SystemParameters.WorkArea;
+
+            // 计算 Left: 屏幕最右边 - 窗口宽度 - 5px
+            this.Left = workArea.Right - this.Width - 5;
+
+            // 计算 Top: 屏幕最下边 - 窗口高度
+            // 这样刚好坐在任务栏上方，不会遮挡
+            this.Top = workArea.Bottom - this.Height-5;
         }
 
         public static void InitAutoService()
@@ -51,7 +80,7 @@ namespace Bloghua.AutoClient.Desktop
                 IImageLocator cv = new OpenCvLocator();
 
                 ServiceLocator.AutoService = new WeChatVisualService(
-                    uia, ocr, input, cv, ServiceLocator.Logger, ServiceLocator.Db);
+                    uia, ocr, input, cv, ServiceLocator.Logger, ServiceLocator.Db,null);
             }
             catch (Exception ex)
             {
