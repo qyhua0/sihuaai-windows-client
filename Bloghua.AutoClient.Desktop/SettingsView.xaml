@@ -5,79 +5,143 @@
       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
       xmlns:ui="http://schemas.modernwpf.com/2019"
       mc:Ignorable="d"
-      d:DesignHeight="600" d:DesignWidth="800"
+      d:DesignHeight="800" d:DesignWidth="800"
       Title="系统设置">
 
-    <StackPanel Margin="24">
-        <TextBlock Text="全局参数配置" FontSize="20" FontWeight="SemiBold" Margin="0,0,0,20"/>
+    <ScrollViewer>
+        <StackPanel Margin="24">
+            <!-- 给标题添加点击事件，作为隐藏开关 -->
+            <!-- 提示：连续点击 5 次开启上帝模式 -->
+            <TextBlock Text="全局参数配置" FontSize="20" FontWeight="SemiBold" Margin="0,0,0,20"
+                       MouseLeftButtonDown="SecretTitle_Click" Cursor="Hand" ToolTip="系统设置"/>
 
-        <!-- 1. 扫描间隔 -->
-        <TextBlock Text="扫描间隔 (秒)" FontWeight="Bold" Margin="0,0,0,5"/>
-        <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
-            <Slider x:Name="sliderScan" Minimum="2" Maximum="300" Width="300" TickFrequency="1" IsSnapToTickEnabled="True"/>
-            <TextBlock Text="{Binding ElementName=sliderScan, Path=Value}" VerticalAlignment="Center" Margin="10,0"/>
-        </StackPanel>
-
-        <!-- 2. 回复等待时间 -->
-        <TextBlock Text="回复随机等待时间 (秒)" FontWeight="Bold" Margin="0,0,0,5"/>
-        <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
-            <ui:NumberBox x:Name="nbWaitMin" Header="最小等待" Value="2" Minimum="0" SpinButtonPlacementMode="Inline" Width="120" Margin="0,0,20,0"/>
-            <ui:NumberBox x:Name="nbWaitMax" Header="最大等待" Value="20" Minimum="0" SpinButtonPlacementMode="Inline" Width="120"/>
-        </StackPanel>
-
-        <!-- 3. 自动发送 -->
-        <ui:ToggleSwitch x:Name="tsAutoSend" Header="开启全自动发送 (On:回车 / Off:仅粘贴)" Margin="0,0,0,20"/>
-
-        <!-- 保存按钮 -->
-        <!-- 使用背景色替代样式，避免报错 -->
-        <Button Content="保存全局设置" 
-                Click="SaveSettings_Click" 
-                Margin="0,0,0,40" 
-                Width="200" 
-                HorizontalAlignment="Left"
-                Background="#0078D7" 
-                Foreground="White" 
-                FontWeight="Bold"/>
-
-        <!-- 4. 授权目标管理 -->
-        <TextBlock Text="授权目标管理" FontSize="20" FontWeight="SemiBold" Margin="0,0,0,10"/>
-
-        <Grid Margin="0,0,0,10">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
-            </Grid.ColumnDefinitions>
-            <StackPanel Orientation="Horizontal">
-                <!-- 修复点：使用 ui:ControlHelper.PlaceholderText -->
-                <TextBox x:Name="txtAddName" 
-                         ui:ControlHelper.PlaceholderText="微信名称/群名" 
-                         Width="150" Margin="0,0,10,0"/>
-
-                <TextBox x:Name="txtAddBizId" 
-                         ui:ControlHelper.PlaceholderText="业务ID (选填)" 
-                         Width="100" Margin="0,0,10,0"/>
-
-                <ComboBox x:Name="cmbPlatform" SelectedIndex="0" Width="100" Margin="0,0,10,0">
-                    <ComboBoxItem Content="WeChat"/>
-                    <ComboBoxItem Content="QQ"/>
-                </ComboBox>
+            <!-- 1. 扫描间隔 -->
+            <TextBlock Text="扫描间隔 (秒)" FontWeight="Bold" Margin="0,0,0,5"/>
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
+                <Slider x:Name="sliderScan" Minimum="2" Maximum="300" Width="300" TickFrequency="1" IsSnapToTickEnabled="True"/>
+                <TextBlock Text="{Binding ElementName=sliderScan, Path=Value}" VerticalAlignment="Center" Margin="10,0"/>
             </StackPanel>
-            <Button Grid.Column="1" Content="添加授权" Click="AddUser_Click"/>
-        </Grid>
 
-        <DataGrid x:Name="gridUsers" AutoGenerateColumns="False" Height="250" Background="White">
-            <DataGrid.Columns>
-                <DataGridTextColumn Header="名称" Binding="{Binding Name}" Width="150"/>
-                <DataGridTextColumn Header="业务ID" Binding="{Binding BusinessId}" Width="100"/>
-                <DataGridTextColumn Header="平台" Binding="{Binding Platform}" Width="80"/>
-                <DataGridTemplateColumn Header="操作">
-                    <DataGridTemplateColumn.CellTemplate>
-                        <DataTemplate>
-                            <Button Content="删除" Click="DeleteUser_Click" Background="#E81123" Foreground="White"/>
-                        </DataTemplate>
-                    </DataGridTemplateColumn.CellTemplate>
-                </DataGridTemplateColumn>
-            </DataGrid.Columns>
-        </DataGrid>
-    </StackPanel>
+            <!-- 2. 回复等待时间 -->
+            <TextBlock Text="回复随机等待时间 (秒)" FontWeight="Bold" Margin="0,0,0,5"/>
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
+                <ui:NumberBox x:Name="nbWaitMin" Header="最小等待" Value="2" Minimum="0" SpinButtonPlacementMode="Inline" Width="120" Margin="0,0,20,0"/>
+                <ui:NumberBox x:Name="nbWaitMax" Header="最大等待" Value="20" Minimum="0" SpinButtonPlacementMode="Inline" Width="120"/>
+            </StackPanel>
+
+            <!-- 新增：主动激活开关 -->
+            <ui:ToggleSwitch x:Name="tsAutoActive" 
+                             Header="主动激活聊天窗口 (推荐开启)" 
+                             OffContent="被动模式：仅当窗口可见时工作，不抢焦点"
+                             OnContent="主动模式：自动置顶并调整窗口位置"
+                             Margin="0,0,0,20"/>
+
+            <!-- 3. 发送 -->
+            <!-- ============================================== -->
+            <!-- 【隐藏区域】全自动开关 -->
+            <!-- ============================================== -->
+            <StackPanel x:Name="panelSecretAuto" Visibility="Collapsed">
+                <ui:ToggleSwitch x:Name="tsAutoSend" 
+                                 Header="⚠ 实验性功能：全自动接管模式" 
+                                 Margin="0,20,0,20"/>
+            </StackPanel>
+
+            <!-- 4. API 配置 -->
+            <TextBlock Text="API 接入配置" FontSize="20" FontWeight="SemiBold" Margin="0,20,0,10"/>
+            <Border Background="#F9F9F9" Padding="15" CornerRadius="8" Margin="0,0,0,20">
+                <StackPanel>
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="10"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <TextBox x:Name="txtApiBaseUrl" ui:ControlHelper.Header="API 基础地址" ui:ControlHelper.PlaceholderText="http://.../api/open"/>
+                        <TextBox Grid.Column="2" x:Name="txtAppId" ui:ControlHelper.Header="AppID" />
+                    </Grid>
+
+                    <!-- 修复点1：使用 PasswordBox -->
+                    <PasswordBox x:Name="pbAppSecret" ui:ControlHelper.Header="AppSecret" Margin="0,0,0,10"/>
+
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="10"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBox x:Name="txtAesKey" ui:ControlHelper.Header="AES Key (16位)"/>
+                        <TextBox Grid.Column="2" x:Name="txtAesIv" ui:ControlHelper.Header="AES IV (16位)"/>
+                    </Grid>
+
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="10"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBox x:Name="txtApiUser" ui:ControlHelper.Header="系统用户名"/>
+                        <!-- 修复点2：使用 PasswordBox -->
+                        <PasswordBox Grid.Column="2" x:Name="pbApiPwd" ui:ControlHelper.Header="系统密码"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <Button Content="保存全局设置" 
+                    Click="SaveSettings_Click" 
+                    Margin="0,0,0,40" 
+                    Width="200" 
+                    HorizontalAlignment="Left"
+                    Background="#0078D7" 
+                    Foreground="White" 
+                    FontWeight="Bold"/>
+
+
+            <!-- ============================================== -->
+            <!-- 【隐藏区域】授权目标管理 -->
+            <!-- ============================================== -->
+            <StackPanel x:Name="panelSecretTargets" Visibility="Collapsed" Margin="0,30,0,0">
+                <TextBlock Text="授权目标管理 (高级)" FontSize="20" FontWeight="SemiBold" Margin="0,0,0,10" Foreground="Red"/>
+
+
+
+                <Grid Margin="0,0,0,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBox x:Name="txtAddName" 
+                             ui:ControlHelper.PlaceholderText="微信名称/群名" 
+                             Width="150" Margin="0,0,10,0"/>
+
+                        <TextBox x:Name="txtAddBizId" 
+                             ui:ControlHelper.PlaceholderText="业务ID (选填)" 
+                             Width="100" Margin="0,0,10,0"/>
+
+                        <ComboBox x:Name="cmbPlatform" SelectedIndex="0" Width="100" Margin="0,0,10,0">
+                            <ComboBoxItem Content="WeChat"/>
+                            <ComboBoxItem Content="QQ"/>
+                        </ComboBox>
+                    </StackPanel>
+                    <Button Grid.Column="1" Content="添加授权" Click="AddUser_Click"/>
+                </Grid>
+
+                <DataGrid x:Name="gridUsers" AutoGenerateColumns="False" Height="250" Background="White">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="名称" Binding="{Binding Name}" Width="150"/>
+                        <DataGridTextColumn Header="业务ID" Binding="{Binding BusinessId}" Width="100"/>
+                        <DataGridTextColumn Header="平台" Binding="{Binding Platform}" Width="80"/>
+                        <DataGridTemplateColumn Header="操作">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Button Content="删除" Click="DeleteUser_Click" Background="#E81123" Foreground="White"/>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
 </Page>

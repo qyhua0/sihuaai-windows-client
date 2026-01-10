@@ -15,5 +15,8 @@ namespace Bloghua.AutoClient.Core.Interfaces
 
         void MoveWindow(int x, int y, int width, int height);
         bool IsWeChatActive();
+
+        bool RefreshWindowStatus(out Rect bounds);
+
     }
 }

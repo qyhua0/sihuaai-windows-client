@@ -147,6 +147,8 @@
     <Compile Include="Bloghua.AutoClient.Core\IOcrService.cs" />
     <Compile Include="Bloghua.AutoClient.Core\IUIAutomationService.cs" />
     <Compile Include="Bloghua.AutoClient.Core\Models.cs" />
+    <Compile Include="Bloghua.AutoClient.Core\models\ApiModels.cs" />
+    <Compile Include="Bloghua.AutoClient.Core\models\SuggestionModels.cs" />
     <Compile Include="Bloghua.AutoClient.Desktop\LogView.xaml.cs">
       <DependentUpon>LogView.xaml</DependentUpon>
     </Compile>
@@ -169,9 +171,11 @@
     <Compile Include="Bloghua.AutoClient.Infrastructure\PaddleLocalOcrService.cs" />
     <Compile Include="Bloghua.AutoClient.Infrastructure\Services\StickerService.cs" />
     <Compile Include="Bloghua.AutoClient.Infrastructure\UiaService.cs" />
+    <Compile Include="Bloghua.AutoClient.Infrastructure\Utils\SecurityHelper.cs" />
     <Compile Include="Bloghua.AutoClient.Infrastructure\VisualHelper.cs" />
     <Compile Include="Bloghua.AutoClient.Infrastructure\Win32InputSimulator.cs" />
     <Compile Include="Bloghua.AutoClient.Services\ChatApiService.cs" />
+    <Compile Include="Bloghua.AutoClient.Services\WeChatAutoPilot.cs" />
     <Compile Include="Bloghua.AutoClient.Services\WeChatVisualService.cs" />
     <Compile Include="Bloghua.AutoClient.Desktop\MainWindow.xaml.cs">
       <DependentUpon>MainWindow.xaml</DependentUpon>

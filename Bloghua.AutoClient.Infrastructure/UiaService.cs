@@ -35,6 +35,11 @@ namespace Bloghua.AutoClient.Infrastructure.Automation
         [DllImport("user32.dll")]
         private static extern int GetWindowThreadProcessId(IntPtr hWnd, out int lpdwProcessId);
 
+        // 引入判断窗口最小化的 API
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool IsIconic(IntPtr hWnd);
+
         public bool AttachToWeChat()
         {
             // 1. 国际PC版微信进程名通常是 "WeChat"，
@@ -176,6 +181,58 @@ namespace Bloghua.AutoClient.Infrastructure.Automation
         [DllImport("user32.dll")]
         [return: MarshalAs(UnmanagedType.Bool)]
         private static extern bool IsWindow(IntPtr hWnd);
+
+
+
+        /// <summary>
+        /// 【新增】尝试刷新句柄并获取位置，但不抢占焦点，不移动窗口
+        /// </summary>
+        /// <returns>如果窗口存在且未最小化，返回 true</returns>
+        public bool RefreshWindowStatus(out Rect bounds)
+        {
+            bounds = Rect.Empty;
+
+            // 1. 如果句柄丢失，尝试重新查找
+            if (_hWnd == IntPtr.Zero || !IsWindow(_hWnd))
+            {
+                Process[] processes = Process.GetProcessesByName("WeChat");
+                if (processes.Length == 0) processes = Process.GetProcessesByName("Weixin");
+
+                foreach (var proc in processes)
+                {
+                    if (proc.MainWindowHandle != IntPtr.Zero)
+                    {
+                        _hWnd = proc.MainWindowHandle;
+                        break;
+                    }
+                }
+            }
+
+            if (_hWnd == IntPtr.Zero) return false;
+
+            // 2. 检查是否最小化
+            if (IsIconic(_hWnd)) return false;
+
+            // 3. 获取当前位置 (不移动)
+            // 使用 UIA 或 Win32 API 获取 Rect
+            try
+            {
+                // 如果 AutomationElement 还没初始化
+                if (_weChatWindow == null) _weChatWindow = AutomationElement.FromHandle(_hWnd);
+
+                bounds = _weChatWindow.Current.BoundingRectangle;
+
+                // 简单的有效性检查 (宽或高太小说明不正常)
+                if (bounds.Width < 100 || bounds.Height < 100) return false;
+
+                return true;
+            }
+            catch
+            {
+                // 如果 UIA 失败，尝试用 Win32 GetWindowRect (需引入) 兜底，这里简化处理返回 false
+                return false;
+            }
+        }
 
     }
 }

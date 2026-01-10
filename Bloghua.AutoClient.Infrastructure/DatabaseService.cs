@@ -32,12 +32,18 @@ namespace Bloghua.AutoClient.Infrastructure.Data
             // 如果配置为空，插入默认值: 自动发送=True
             if (_db.Find<AppSetting>("IsAutoSend") == null)
             {
-                SaveSetting("IsAutoSend", "true");
+                SaveSetting("IsAutoSend", "false");
             }
 
             if (_db.Find<AppSetting>("ScanInterval") == null) SaveSetting("ScanInterval", "6");
             if (_db.Find<AppSetting>("ReplyWaitMin") == null) SaveSetting("ReplyWaitMin", "2");
             if (_db.Find<AppSetting>("ReplyWaitMax") == null) SaveSetting("ReplyWaitMax", "20");
+
+            // 默认开启主动激活，用户可在设置里关掉
+            if (_db.Find<AppSetting>("AutoActiveWindow") == null)
+            {
+                SaveSetting("AutoActiveWindow", "true");
+            }
         }
 
         // --- 配置相关 ---

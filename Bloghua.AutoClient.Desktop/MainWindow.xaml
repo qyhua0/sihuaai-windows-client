@@ -6,14 +6,17 @@
         xmlns:ui="http://schemas.modernwpf.com/2019"
         mc:Ignorable="d"
         ui:WindowHelper.UseModernWindowStyle="True"
-        Title="AI 客服助手" Height="700" Width="1100">
+        Title="斯华AI-客服助手" Height="700" Width="1100">
 
     <Grid>
         <ui:NavigationView x:Name="NavView" 
-                           PaneDisplayMode="Left" 
-                           SelectionChanged="NavView_SelectionChanged"
-                           IsSettingsVisible="False">
-
+                          PaneDisplayMode="Left"
+                           IsPaneOpen="False" 
+                           IsSettingsVisible="False"
+                           SelectionChanged="NavView_SelectionChanged">
+            <!-- IsPaneOpen="False": 默认折叠菜单 -->
+            <!-- PaneDisplayMode="Left": 标准模式，折叠后只显示汉堡菜单按钮 -->
+            <!-- 如果想要一直显示图标条，可以用 PaneDisplayMode="LeftCompact" -->
             <!-- 1. 菜单项 -->
             <ui:NavigationView.MenuItems>
                 <!-- 这里不需要额外的列表容器，直接放 Item 即可 -->

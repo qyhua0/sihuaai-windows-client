@@ -32,6 +32,8 @@ namespace Bloghua.AutoClient.Desktop
 
                 // 默认选中第一个菜单项
                 NavView.SelectedItem = NavView.MenuItems[0];
+
+          
             }
             catch (Exception ex)
             {
