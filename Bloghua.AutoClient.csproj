@@ -163,9 +163,12 @@
     <Compile Include="Bloghua.AutoClient.Desktop\SettingsView.xaml.cs">
       <DependentUpon>SettingsView.xaml</DependentUpon>
     </Compile>
+    <Compile Include="Bloghua.AutoClient.Desktop\Views\AboutView.xaml.cs">
+      <DependentUpon>AboutView.xaml</DependentUpon>
+    </Compile>
     <Compile Include="Bloghua.AutoClient.Infrastructure\BitmapFilter.cs" />
     <Compile Include="Bloghua.AutoClient.Infrastructure\DatabaseService.cs" />
-    <Compile Include="Bloghua.AutoClient.Infrastructure\FileLoggerService.cs" />
+    <Compile Include="Bloghua.AutoClient.Infrastructure\Services\FileLoggerService.cs" />
     <Compile Include="Bloghua.AutoClient.Infrastructure\HttpOcrService.cs" />
     <Compile Include="Bloghua.AutoClient.Infrastructure\OpenCvLocator.cs" />
     <Compile Include="Bloghua.AutoClient.Infrastructure\PaddleLocalOcrService.cs" />
@@ -190,6 +193,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="Bloghua.AutoClient.Desktop\SettingsView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Bloghua.AutoClient.Desktop\Views\AboutView.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

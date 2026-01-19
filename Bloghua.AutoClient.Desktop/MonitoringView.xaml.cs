@@ -8,7 +8,8 @@ using Newtonsoft.Json; // 必须引用
 using Bloghua.AutoClient.Core.Models; // 引用 SuggestionItem
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
-
+using Bloghua.AutoClient.Services;
+using System.Threading.Tasks;
 
 namespace Bloghua.AutoClient.Desktop.Views
 {
@@ -16,15 +17,34 @@ namespace Bloghua.AutoClient.Desktop.Views
     {
         private DispatcherTimer _loopTimer;
 
+        private DispatcherTimer _healthCheckTimer; // 新增：服务器健康检查定时器
+
+
         public MonitoringView()
         {
+
             InitializeComponent();
+            txtConsole.Text = ""; // 清空初始文本，由日志事件填充
+
+            // 初始化按钮状态
+            UpdateButtonsState(false);
         }
 
-        private void Start_Click(object sender, RoutedEventArgs e)
+        private void UpdateButtonsState(bool isRunning)
+        {
+            // 运行中：启动不可用，停止可用
+            btnStart.IsEnabled = !isRunning;
+            btnStop.IsEnabled = isRunning;
+        }
+
+
+
+        private async void Start_Click(object sender, RoutedEventArgs e)
         {
             try
             {
+                UpdateButtonsState(true); // 立即更新按钮，防止重复点击
+
                 MainWindow.InitAutoService();
 
                 // 1. 订阅状态
@@ -39,23 +59,76 @@ namespace Bloghua.AutoClient.Desktop.Views
                 ServiceLocator.AutoService.OnChatTargetChanged -= OnChatTargetChanged;
                 ServiceLocator.AutoService.OnChatTargetChanged += OnChatTargetChanged;
 
+
+                // 立即检查一次服务器状态
+                await CheckServerStatus();
+
                 if (_loopTimer == null)
                 {
                     _loopTimer = new DispatcherTimer();
-                    _loopTimer.Interval = TimeSpan.FromSeconds(3); // 3秒检查一次当前窗口
+                    int interval = int.Parse(ServiceLocator.Db.GetSetting("ScanInterval", "6"));
+                    _loopTimer.Interval = TimeSpan.FromSeconds(interval);
                     _loopTimer.Tick += LoopTimer_Tick;
                 }
 
                 _loopTimer.Start();
-                lblStatus.Text = "监听中 (辅助模式)";
+
+                // 启动健康检查定时器 (每分钟检查一次)
+                if (_healthCheckTimer == null)
+                {
+                    _healthCheckTimer = new DispatcherTimer();
+                    _healthCheckTimer.Interval = TimeSpan.FromMinutes(1);
+                    _healthCheckTimer.Tick += async (s, args) => await CheckServerStatus();
+                }
+                _healthCheckTimer.Start();
+
+                lblStatus.Text = "运行中";
                 lblStatus.Foreground = Brushes.Green;
                 lightStatus.Fill = Brushes.Green;
+
+
+
                 LogToUI("服务已启动，请打开微信并点击任意授权好友的聊天窗口。");
             }
             catch (Exception ex)
             {
                 LogToUI($"启动异常: {ex.Message}");
             }
+        }
+
+
+        // 【新增】服务器状态检查逻辑
+        private async Task CheckServerStatus()
+        {
+            var db = ServiceLocator.Db;
+            var api = new ChatApiService();
+            var status = await api.CheckHealthAsync(
+                db.GetSetting("ApiBaseUrl", ""),
+                db.GetSetting("ApiUser", ""),
+                db.GetSetting("ApiPwd", "")
+            );
+
+            Dispatcher.Invoke(() =>
+            {
+                switch (status)
+                {
+                    case ChatApiService.ApiStatus.Normal:
+                        lblServerStatus.Text = "正常";
+                        lblServerStatus.Foreground = Brushes.Green;
+                        iconServer.Foreground = Brushes.Green;
+                        break;
+                    case ChatApiService.ApiStatus.ConfigError:
+                        lblServerStatus.Text = "配置/密码错误";
+                        lblServerStatus.Foreground = Brushes.Orange;
+                        iconServer.Foreground = Brushes.Orange;
+                        break;
+                    case ChatApiService.ApiStatus.Unreachable:
+                        lblServerStatus.Text = "不可访问";
+                        lblServerStatus.Foreground = Brushes.Red;
+                        iconServer.Foreground = Brushes.Red;
+                        break;
+                }
+            });
         }
 
         // 1. 处理标题更新
@@ -169,6 +242,8 @@ namespace Bloghua.AutoClient.Desktop.Views
 
         private void Stop_Click(object sender, RoutedEventArgs e)
         {
+            UpdateButtonsState(false); // 立即更新按钮，防止重复点击
+
             if (_loopTimer != null) _loopTimer.Stop();
 
             // 取消订阅，防止内存泄漏
@@ -237,19 +312,35 @@ namespace Bloghua.AutoClient.Desktop.Views
 
 
         // 状态灯更新
-        private void OnStatusChanged(WorkStatus status)
+        private void OnStatusChanged(WorkStatus status, string context)
         {
             Dispatcher.Invoke(() =>
             {
+                // 先隐藏上下文，只在特定状态显示
+                lblStatusContext.Visibility = Visibility.Collapsed;
+                lblStatusContext.Text = "";
+
                 if (status == WorkStatus.Processing)
                 {
                     lightStatus.Fill = Brushes.Orange;
-                    lblStatus.Text = "思考中...";
+                    lblStatus.Text = "思考中";
+
+                    // 【新增】如果有内容，显示出来
+                    if (!string.IsNullOrEmpty(context))
+                    {
+                        lblStatusContext.Text = $"({context})"; // 加个括号更好看
+                        lblStatusContext.Visibility = Visibility.Visible;
+                    }
                 }
                 else if (status == WorkStatus.Scanning)
                 {
                     lightStatus.Fill = Brushes.Blue;
                     lblStatus.Text = "读取中...";
+                }
+                else if (status == WorkStatus.Sending)
+                {
+                    lightStatus.Fill = Brushes.Green;
+                    lblStatus.Text = "回复中...";
                 }
                 else
                 {
@@ -261,8 +352,25 @@ namespace Bloghua.AutoClient.Desktop.Views
 
         private void LogToUI(string msg)
         {
-            txtConsole.AppendText($"[{DateTime.Now:HH:mm:ss}] {msg}\n");
-            txtConsole.ScrollToEnd();
+            //txtConsole.AppendText($"[{DateTime.Now:HH:mm:ss}] {msg}\n");
+            //txtConsole.ScrollToEnd();
+
+
+            Dispatcher.Invoke(() =>
+            {
+                // 格式化时间
+                string timeStr = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+                txtConsole.AppendText($"[{timeStr}] {msg}\n");
+                txtConsole.ScrollToEnd();
+
+                // 注意：这里不再调用 ServiceLocator.Logger.Log(msg)，
+                // 因为 msg 通常就是从 Service 传来的，Service 内部已经写过文件日志了。
+                // 只有 UI 层自己产生的日志 (如"服务已停止") 才需要手动写文件。
+                if (!msg.StartsWith("[业务]")) // 简单过滤，避免重复写文件
+                {
+                    ServiceLocator.Logger?.Log(msg);
+                }
+            });
         }
 
         // 【新增】复制按钮逻辑

@@ -58,11 +58,18 @@ namespace Bloghua.AutoClient.Services
         // 【修改】事件签名改为两个参数：(API回复, 用户原始消息)
         public event Action<string, string> OnSuggestionReady;
 
+
+
         // 状态变更 (UI 更新红绿灯)
-        public event Action<WorkStatus> OnStatusChanged;
+        //public event Action<WorkStatus> OnStatusChanged;
+        // 增加 string 参数用于传递上下文内容
+        public event Action<WorkStatus, string> OnStatusChanged;
 
         // 聊天对象变更 (UI 更新当前窗口标题)
         public event Action<string> OnChatTargetChanged;
+
+        // 【新增】专门用于 UI 显示的日志事件
+        public event Action<string> OnLog;
 
         #endregion
 
@@ -100,7 +107,7 @@ namespace Bloghua.AutoClient.Services
         public async Task RunCycleAsync()
         {
 
-            // 【核心修复 1】如果正在忙（等待API），直接退出，绝不扫描新窗口
+            //【核心修复 1】如果正在忙（等待API），直接退出，绝不扫描新窗口
             if (_isProcessing)
             {
                 // 可选：通知 UI 正在忙
@@ -201,6 +208,7 @@ namespace Bloghua.AutoClient.Services
                     }
                     else
                     {
+                       
                         // --- 辅助模式 (默认) ---
                         // 任何窗口都处理，但在库里的优先使用库配置(BizId)
                         if (targetUser == null)
@@ -213,7 +221,12 @@ namespace Bloghua.AutoClient.Services
                         }
 
                         // 简单的黑名单过滤
-                        if (!IsSystemEntrySimplified(targetUser.Name))
+                        if (IsSystemEntrySimplified(targetUser.Name))
+                        {
+                            _logger.Log($"辅助模式: {targetUser.Name}是黑名单");
+
+                        }
+                        else
                         {
                             SetStatus(WorkStatus.Scanning);
                             await ProcessChatContent(fullWindow, winRect, splitX, targetUser);
@@ -276,6 +289,16 @@ namespace Bloghua.AutoClient.Services
 
         #endregion
 
+
+        // 辅助方法：统一日志出口
+        private void LogInfo(string msg)
+        {
+            // 1. 写文件
+            _logger.Log(msg);
+            // 2. 通知 UI
+            OnLog?.Invoke(msg);
+        }
+
         #region Private Core Logic
 
         private async Task ProcessChatContent(Bitmap fullBmp, WinRect winRect, int splitX, AuthorizedTarget user)
@@ -284,23 +307,77 @@ namespace Bloghua.AutoClient.Services
             int topY = VisualHelper.FindHorizontalLineDebug(fullBmp, splitX, 50, 90, "TOP");
             if (topY == -1) topY = 60;
 
-            int searchStart = fullBmp.Height - 450;
-            int searchEnd = fullBmp.Height - 150;
-            int bottomY = VisualHelper.FindHorizontalLineDebug(fullBmp, splitX, searchStart, searchEnd, "BOTTOM");
-            if (bottomY == -1) bottomY = fullBmp.Height - 360;
 
+
+            // =============================================================
+            // 2. 【核心修复】定位底部横线 (输入框上沿)
+            // =============================================================
+            int bottomY = -1;
+
+            // 策略 A: 优先使用"笑脸图标"定位 (最稳健)
+            // 只要找到了笑脸，分割线肯定在笑脸上面一点点
+            var smileLoc = _cv.FindImageCenter(fullBmp, "Images/icon_smile.png");
+
+            if (smileLoc.HasValue)
+            {
+                // 经过测量，分割线通常在笑脸中心上方约 22-28 像素处
+                // 我们取 25
+                bottomY = smileLoc.Value.Y - 25;
+                 _logger.Log($"通过锚点定位底部线: {bottomY}");
+            }
+            else
+            {
+                // 策略 B: 如果没找到笑脸 (比如被遮挡)，采用大范围"从下往上"扫描
+                // 既然输入框大小可变，我们就在 splitX 右侧，从底部向上扫，找第一条贯穿的长灰线
+
+                // 扫描范围：从底部-100 开始，一直扫到顶部+100
+                int scanStart = fullBmp.Height - 80; // 避开最底部的发送按钮区
+                int scanEnd = topY + 50;
+
+                // 我们需要一个新的 Helper 方法：FindHorizontalLineFromBottom (从下往上)
+                // 如果没有这个方法，暂时用原来的，但扩大范围
+                bottomY = VisualHelper.FindHorizontalLineDebug(fullBmp, splitX, 200, fullBmp.Height - 100, "BOTTOM_WIDE");
+                _logger.Log($"通过FindHorizontalLineFromBottom定位底部线: {bottomY}");
+
+            }
+
+            // 兜底：如果还是没找到，或者位置极其不合理
+            if (bottomY == -1 || bottomY < topY + 50 || bottomY > fullBmp.Height - 50)
+            {
+                // 这种情况下通常是输入框拉得太高或太低，或者截图失败
+                // 默认给一个大概值，或者直接 return 避免乱发
+                _logger.Log("⚠️ 无法确定消息区底部边界，使用默认值。");
+                bottomY = fullBmp.Height - 360;
+            }
+
+
+            // int searchStart = fullBmp.Height - 450;
+            // int searchEnd = fullBmp.Height - 150;
+
+            // =============================================================
+            // 3. 计算矩形
+            // =============================================================
             int msgX = splitX + 60;
             int msgW = fullBmp.Width - msgX - 60;
-            int msgH = bottomY - topY - 10;
-            if (msgH < 50) return;
+            int msgH = bottomY - topY - 5; // 稍微留点空隙
+
+            if (msgH < 20) return; // 区域太小
 
             Rectangle rectMsg = new Rectangle(msgX, topY + 5, msgW, msgH);
 
-            // 2. 提取最后一条气泡
+
+           
+
+            // 4. 提取最后一条气泡
             string msgContent = "";
 
             using (Bitmap msgAreaBmp = fullBmp.Clone(rectMsg, fullBmp.PixelFormat))
             {
+
+                // 保存这张图，看看截到了什么
+                try { msgAreaBmp.Save("debug_chat_area.png"); } catch { }
+
+
                 var bubble = VisualHelper.FindLastBubble(msgAreaBmp);
 
                 // 没气泡或是我发的(绿色)，跳过
@@ -360,7 +437,9 @@ namespace Bloghua.AutoClient.Services
             _processingUserName = user.Name; // 记住我们正在为谁服务
 
             _logger.Log($"[OCR读取] {user.Name}: {msgContent}");
-            SetStatus(WorkStatus.Processing);
+            LogInfo($"[获取消息] 对象: {user.Name}, 内容: {msgContent}");
+
+            SetStatus(WorkStatus.Processing,msgContent);
 
             try
             {
@@ -371,7 +450,13 @@ namespace Bloghua.AutoClient.Services
                 if (string.IsNullOrEmpty(replyContent))
                 {
                     source = "AI大模型";
+                    LogInfo($"[处理中] 正在请求 API 处理...");
+                    _logger.Log($"[DEBUG] 准备调用 API. AppId: ... Session: {user.Name}");
+
                     replyContent = await _api.GetReplyAsync($"{user.Name}_{user.BusinessId}", msgContent);
+
+                    _logger.Log($"[DEBUG] API原始响应: {replyContent}");
+
                 }
 
                 if (string.IsNullOrEmpty(replyContent)) return;
@@ -399,6 +484,8 @@ namespace Bloghua.AutoClient.Services
                     //OnSuggestionReady?.Invoke(replyContent);
                     // 【修改】调用 Invoke 时传入两个参数：回复内容，用户提问内容
                     OnSuggestionReady?.Invoke(replyContent, msgContent);
+
+                    LogInfo($"[处理完成] 建议已生成");
                 }
 
             }
@@ -470,12 +557,18 @@ namespace Bloghua.AutoClient.Services
         // 简单的系统号过滤
         private bool IsSystemEntrySimplified(string name)
         {
-            if (string.IsNullOrEmpty(name)) return false;
-            string[] blackList = { "客服消息", "服务通知", "订阅号", "文件传输助手", "微信团队", "微信支付" };
+            if (string.IsNullOrEmpty(name))
+            {
+                return false;
+            }
+            string[] blackList = { "客服消息", "服务通知", "订阅号", "文件传输助手", "微信团队", "微信支付", "服务号", "公众号"};
             return blackList.Any(k => name.Contains(k));
         }
 
-        private void SetStatus(WorkStatus status) => OnStatusChanged?.Invoke(status);
+        private void SetStatus(WorkStatus status, string context = "")
+        {
+            OnStatusChanged?.Invoke(status, context);
+        }
 
         private async Task<string> CropAndOcr(Bitmap original, Rectangle roi, bool useDarkFilter)
         {

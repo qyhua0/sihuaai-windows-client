@@ -17,7 +17,7 @@
         <StackPanel Grid.Column="0">
             <TextBlock Text="运行状态" FontSize="20" FontWeight="Bold" Margin="0,0,0,15"/>
 
-            <!-- 【新增】显示当前识别到的聊天对象 -->
+            <!-- 显示当前识别到的聊天对象 -->
             <Border Background="#E6F2FF" CornerRadius="4" Padding="10" Margin="0,0,0,20">
                 <StackPanel>
                     <TextBlock Text="当前检测窗口" FontSize="12" Foreground="Gray"/>
@@ -25,15 +25,41 @@
                 </StackPanel>
             </Border>
 
-            <!-- 状态灯 -->
+            <!-- 状态显示区域 -->
             <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
+                <!-- 状态灯 -->
                 <Ellipse x:Name="lightStatus" Width="16" Height="16" Fill="Gray" Margin="0,0,10,0"/>
+
+                <!-- 状态文字 (如：思考中) -->
                 <TextBlock x:Name="lblStatus" Text="未启动" VerticalAlignment="Center" FontSize="14"/>
+
+                <!-- 【新增】上下文内容显示 (如：针对"..."进行思考) -->
+                <!-- TextTrimming="CharacterEllipsis" 实现超长省略 -->
+                <!-- MaxWidth="150" 限制最大宽度，防止撑破界面 -->
+                <TextBlock x:Name="lblStatusContext" 
+                           Text="" 
+                           VerticalAlignment="Center" 
+                           FontSize="12" 
+                           Foreground="Gray" 
+                           Margin="10,0,0,0" 
+                           TextTrimming="CharacterEllipsis" 
+                           MaxWidth="180" 
+                           ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"
+                           Visibility="Collapsed"/>
             </StackPanel>
 
+            <!-- 【新增】服务器通讯状态 -->
             <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
-                <Button Content="开启辅助" Click="Start_Click" Width="100" Margin="0,0,10,0"/>
-                <Button Content="停止" Click="Stop_Click" Width="100" Background="#E81123" Foreground="White"/>
+                <ui:FontIcon x:Name="iconServer" Glyph="&#xE812;" FontSize="16" Foreground="Gray" Margin="0,0,10,0"/>
+                <TextBlock Text="服务器通讯：" VerticalAlignment="Center" FontSize="14"/>
+                <TextBlock x:Name="lblServerStatus" Text="未检测" VerticalAlignment="Center" FontSize="14" FontWeight="Bold" Foreground="Gray" Margin="5,0,0,0"/>
+            </StackPanel>
+
+            <!-- 按钮组 -->
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
+                <!-- 初始状态：启动可用，停止不可用 -->
+                <Button x:Name="btnStart" Content="开启辅助" Click="Start_Click" Width="100" Margin="0,0,10,0" IsEnabled="True"/>
+                <Button x:Name="btnStop" Content="停止" Click="Stop_Click" Width="100" Background="#E81123" Foreground="White" IsEnabled="False"/>
             </StackPanel>
 
             <TextBlock Text="系统日志" FontWeight="SemiBold" Margin="0,0,0,5"/>

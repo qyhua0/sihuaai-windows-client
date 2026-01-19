@@ -46,8 +46,10 @@
                                  Margin="0,20,0,20"/>
             </StackPanel>
 
-            <!-- 4. API 配置 -->
-            <TextBlock Text="API 接入配置" FontSize="20" FontWeight="SemiBold" Margin="0,20,0,10"/>
+            <!-- ============================================== -->
+            <!-- 4. API 基础配置 -->
+            <!-- ============================================== -->
+            <TextBlock Text="API 基础配置" FontSize="18" FontWeight="SemiBold" Margin="0,20,0,10"/>
             <Border Background="#F9F9F9" Padding="15" CornerRadius="8" Margin="0,0,0,20">
                 <StackPanel>
                     <Grid Margin="0,0,0,10">
@@ -56,12 +58,11 @@
                             <ColumnDefinition Width="10"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
-
                         <TextBox x:Name="txtApiBaseUrl" ui:ControlHelper.Header="API 基础地址" ui:ControlHelper.PlaceholderText="http://.../api/open"/>
                         <TextBox Grid.Column="2" x:Name="txtAppId" ui:ControlHelper.Header="AppID" />
                     </Grid>
 
-                    <!-- 修复点1：使用 PasswordBox -->
+                    <!-- 【修复】使用 PasswordBox 隐藏 AppSecret -->
                     <PasswordBox x:Name="pbAppSecret" ui:ControlHelper.Header="AppSecret" Margin="0,0,0,10"/>
 
                     <Grid Margin="0,0,0,10">
@@ -73,29 +74,43 @@
                         <TextBox x:Name="txtAesKey" ui:ControlHelper.Header="AES Key (16位)"/>
                         <TextBox Grid.Column="2" x:Name="txtAesIv" ui:ControlHelper.Header="AES IV (16位)"/>
                     </Grid>
+                </StackPanel>
+            </Border>
 
-                    <Grid Margin="0,0,0,10">
+            <!-- ============================================== -->
+            <!-- 5. 【新增】账号配置与测试 -->
+            <!-- ============================================== -->
+            <TextBlock Text="账号配置" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,10"/>
+            <Border Background="#E6F2FF" Padding="15" CornerRadius="8" Margin="0,0,0,20" BorderBrush="#CCE5FF" BorderThickness="1">
+                <StackPanel>
+                    <Grid Margin="0,0,0,15">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="10"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <TextBox x:Name="txtApiUser" ui:ControlHelper.Header="系统用户名"/>
-                        <!-- 修复点2：使用 PasswordBox -->
+
+                        <!-- 【修复】使用 PasswordBox 隐藏密码 -->
                         <PasswordBox Grid.Column="2" x:Name="pbApiPwd" ui:ControlHelper.Header="系统密码"/>
                     </Grid>
+
+                    <!-- 测试按钮 -->
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <TextBlock x:Name="lblTestResult" VerticalAlignment="Center" Margin="0,0,10,0" FontSize="12"/>
+                        <Button Content="测试登录 (Test)" Click="TestLogin_Click" Width="120"/>
+                    </StackPanel>
                 </StackPanel>
             </Border>
 
-            <Button Content="保存全局设置" 
+            <!-- 保存按钮 -->
+            <Button Content="保存所有配置" 
                     Click="SaveSettings_Click" 
                     Margin="0,0,0,40" 
-                    Width="200" 
-                    HorizontalAlignment="Left"
+                    HorizontalAlignment="Stretch"
                     Background="#0078D7" 
                     Foreground="White" 
-                    FontWeight="Bold"/>
-
+                    FontWeight="Bold" Height="40"/>
 
             <!-- ============================================== -->
             <!-- 【隐藏区域】授权目标管理 -->

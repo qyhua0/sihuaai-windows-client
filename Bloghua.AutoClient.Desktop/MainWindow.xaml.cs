@@ -134,6 +134,9 @@ namespace Bloghua.AutoClient.Desktop
                     case "Settings":
                         page = new SettingsView();
                         break;
+                    case "About": 
+                        page = new AboutView();
+                        break;
                 }
 
                 if (page != null)

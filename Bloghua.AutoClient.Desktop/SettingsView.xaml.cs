@@ -2,6 +2,8 @@
 using System.Windows;
 using System.Windows.Controls;
 using Bloghua.AutoClient.Core.Entities;
+using System.Windows.Media; // 用于设置测试结果颜色
+using Bloghua.AutoClient.Services;
 
 namespace Bloghua.AutoClient.Desktop.Views
 {
@@ -41,6 +43,14 @@ namespace Bloghua.AutoClient.Desktop.Views
 
             // 列表
             gridUsers.ItemsSource = db.GetAllTargets();
+
+            // API 基础
+            txtApiBaseUrl.Text = db.GetSetting("ApiBaseUrl", "http://127.0.0.1:8000/api/open");
+            txtAppId.Text = db.GetSetting("AppId", "");
+            txtAesKey.Text = db.GetSetting("AesKey", "");
+            txtAesIv.Text = db.GetSetting("AesIv", "");
+
+       
         }
 
         private void SaveSettings_Click(object sender, RoutedEventArgs e)
@@ -97,7 +107,7 @@ namespace Bloghua.AutoClient.Desktop.Views
             }
         }
 
-        // 【新增】彩蛋触发逻辑
+        // 彩蛋触发逻辑
         private void SecretTitle_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)
         {
             _clickCount++;
@@ -109,6 +119,33 @@ namespace Bloghua.AutoClient.Desktop.Views
 
                 MessageBox.Show("开发者模式已激活！\n请谨慎操作全自动与授权管理功能。", "系统提示");
                 _clickCount = 0; // 重置
+            }
+        }
+
+
+
+        // 测试登录逻辑
+        private async void TestLogin_Click(object sender, RoutedEventArgs e)
+        {
+            lblTestResult.Text = "正在连接...";
+            lblTestResult.Foreground = Brushes.Gray;
+
+            string url = txtApiBaseUrl.Text.Trim();
+            string user = txtApiUser.Text.Trim();
+            string pwd = pbApiPwd.Password.Trim(); // 取当前输入框的值，不是数据库的
+
+            var api = new ChatApiService();
+            var result = await api.TestConnectionAsync(url, user, pwd);
+
+            if (result.success)
+            {
+                lblTestResult.Text = "✔ 测试通过";
+                lblTestResult.Foreground = Brushes.Green;
+            }
+            else
+            {
+                lblTestResult.Text = "❌ " + result.message;
+                lblTestResult.Foreground = Brushes.Red;
             }
         }
     }

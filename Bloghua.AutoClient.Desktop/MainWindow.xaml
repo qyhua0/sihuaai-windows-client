@@ -24,7 +24,14 @@
                 <ui:NavigationViewItem Content="会话记录" Icon="Comment" Tag="Logs"/>
                 <ui:NavigationViewItem Content="问答管理" Icon="Help" Tag="QA"/>
                 <ui:NavigationViewItem Content="系统设置" Icon="Setting" Tag="Settings"/>
+
+      
             </ui:NavigationView.MenuItems>
+
+            <!-- 【新增】底部菜单 (关于) -->
+            <ui:NavigationView.FooterMenuItems>
+                <ui:NavigationViewItem Content="关于我们" Icon="ContactInfo" Tag="About"/>
+            </ui:NavigationView.FooterMenuItems>
 
             <!-- 2. 内容区域 (必须放在 Content 属性中) -->
             <ui:NavigationView.Content>

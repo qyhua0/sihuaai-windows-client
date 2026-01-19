@@ -32,6 +32,43 @@ namespace Bloghua.AutoClient.Services
         }
 
         /// <summary>
+        /// 测试登录 (用于设置界面测试按钮)
+        /// </summary>
+        public async Task<(bool success, string message)> TestConnectionAsync(string baseUrl, string username, string password)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(baseUrl) || string.IsNullOrEmpty(username) || string.IsNullOrEmpty(password))
+                {
+                    return (false, "参数不能为空");
+                }
+
+                var loginData = new TokenRequest { username = username, password = password };
+                var content = new StringContent(JsonConvert.SerializeObject(loginData), Encoding.UTF8, "application/json");
+
+                // 发起请求
+                var response = await _httpClient.PostAsync($"{baseUrl}/token", content);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var resStr = await response.Content.ReadAsStringAsync();
+                    var tokenRes = JsonConvert.DeserializeObject<TokenResponse>(resStr);
+
+                    if (!string.IsNullOrEmpty(tokenRes?.access_token))
+                    {
+                        return (true, "连接成功！Token 获取正常。");
+                    }
+                }
+
+                return (false, $"连接失败: HTTP {response.StatusCode}");
+            }
+            catch (Exception ex)
+            {
+                return (false, $"异常: {ex.Message}");
+            }
+        }
+
+        /// <summary>
         /// 对外公开的调用方法 (保持签名不变)
         /// </summary>
         public async Task<string> GetReplyAsync(string sessionKey, string content, bool isImage = false)
@@ -170,6 +207,53 @@ namespace Bloghua.AutoClient.Services
             else
             {
                 throw new Exception($"获取 Token 失败: {response.StatusCode}");
+            }
+        }
+
+
+        /// <summary>
+        /// API 状态枚举
+        /// </summary>
+        public enum ApiStatus
+        {
+            Normal,         // 正常 (200)
+            ConfigError,    // 配置错误 (401/403)
+            Unreachable,    // 无法连接 (404/500/Timeout)
+            Unknown
+        }
+
+        /// <summary>
+        /// 检查服务器连接状态
+        /// </summary>
+        public async Task<ApiStatus> CheckHealthAsync(string baseUrl, string user, string pwd)
+        {
+            try
+            {
+                // 如果没有配置，直接返回配置错误
+                if (string.IsNullOrEmpty(baseUrl)) return ApiStatus.ConfigError;
+
+                // 尝试获取 Token 作为探针
+                // 如果有缓存且未过期，说明连接是通的
+                if (!string.IsNullOrEmpty(_accessToken) && DateTime.Now < _tokenExpireTime)
+                {
+                    return ApiStatus.Normal;
+                }
+
+                // 尝试用错误凭证请求一次，看能不能连通服务器
+                // 或者直接调用 EnsureTokenAsync 的逻辑
+                // 这里为了简单，复用 TestConnectionAsync 的核心逻辑
+                var result = await TestConnectionAsync(baseUrl, user, pwd);
+                if (result.success) return ApiStatus.Normal;
+
+                // 根据错误消息判断
+                if (result.message.Contains("401") || result.message.Contains("403"))
+                    return ApiStatus.ConfigError;
+
+                return ApiStatus.Unreachable;
+            }
+            catch
+            {
+                return ApiStatus.Unreachable;
             }
         }
     }

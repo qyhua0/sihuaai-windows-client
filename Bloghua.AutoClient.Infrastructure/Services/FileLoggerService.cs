@@ -28,18 +28,19 @@ namespace Bloghua.AutoClient.Infrastructure.Services
 
         private void WriteToFile(string content)
         {
+        
+
             try
             {
                 lock (_lock)
                 {
-                    string line = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {content}{Environment.NewLine}";
+                    // 【修复】使用 yyyy-MM-dd HH:mm:ss 格式
+                    string timeStr = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+                    string line = $"[{timeStr}] {content}{Environment.NewLine}";
                     File.AppendAllText(_logPath, line);
                 }
             }
-            catch
-            {
-                // 忽略日志写入本身的错误，避免死循环
-            }
+            catch { }
         }
     }
 }
