@@ -1,4 +1,5 @@
 ﻿using Newtonsoft.Json;
+using System.Collections.Generic;
 
 namespace Bloghua.AutoClient.Core.Models
 {
@@ -20,6 +21,25 @@ namespace Bloghua.AutoClient.Core.Models
     {
         public string content { get; set; }
         public string session_key { get; set; }
+
+        // 【新增】提示词/角色编码
+        public string prompt_code { get; set; }
+    }
+
+    public class PromptItem
+    {
+        public string code { get; set; }
+        public string name { get; set; }
+        public bool is_default { get; set; }
+
+        // 为了 UI 绑定方便，重写 ToString
+        public override string ToString() => name;
+    }
+
+    // 【新增】角色列表响应模型
+    public class PromptListPayload
+    {
+        public List<PromptItem> prompts { get; set; }
     }
 
     public class ChatReplyPayload
@@ -27,6 +47,7 @@ namespace Bloghua.AutoClient.Core.Models
         public string reply { get; set; }
         public int usage { get; set; }
         public string source { get; set; } // qa, rag, llm
+
     }
 
     // === 3. 信封结构 (传输层) ===

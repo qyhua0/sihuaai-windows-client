@@ -18,10 +18,26 @@
             <TextBlock Text="运行状态" FontSize="20" FontWeight="Bold" Margin="0,0,0,15"/>
 
             <!-- 显示当前识别到的聊天对象 -->
+            <!-- 当前检测窗口区域 -->
             <Border Background="#E6F2FF" CornerRadius="4" Padding="10" Margin="0,0,0,20">
                 <StackPanel>
                     <TextBlock Text="当前检测窗口" FontSize="12" Foreground="Gray"/>
-                    <TextBlock x:Name="lblCurrentChat" Text="等待扫描..." FontSize="16" FontWeight="Bold" Foreground="#0078D7" TextTrimming="CharacterEllipsis"/>
+                    <TextBlock x:Name="lblCurrentChat" Text="等待扫描..." FontSize="16" FontWeight="Bold" Foreground="#0078D7" TextTrimming="CharacterEllipsis" Margin="0,0,0,5"/>
+
+                    <!-- 【新增】角色选择下拉框 -->
+                    <Grid Margin="0,5,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="设定人设：" VerticalAlignment="Center" FontSize="12"/>
+                        <ComboBox x:Name="cmbRoles" Grid.Column="1" Margin="5,0,0,0" 
+                                  DisplayMemberPath="Name" 
+                                  SelectedValuePath="Code"
+                                  SelectionChanged="CmbRoles_SelectionChanged"
+                                  IsEnabled="False"/>
+                        <!-- 默认禁用，识别到人后启用 -->
+                    </Grid>
                 </StackPanel>
             </Border>
 

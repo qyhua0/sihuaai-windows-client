@@ -10,6 +10,7 @@ using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using Bloghua.AutoClient.Services;
 using System.Threading.Tasks;
+using System.Linq;
 
 namespace Bloghua.AutoClient.Desktop.Views
 {
@@ -19,6 +20,10 @@ namespace Bloghua.AutoClient.Desktop.Views
 
         private DispatcherTimer _healthCheckTimer; // 新增：服务器健康检查定时器
 
+        // 缓存当前的 SessionKey，用于保存配置
+        private string _currentSessionKey = "";
+        // 防止代码自动变更选项时触发 SelectionChanged 保存逻辑
+        private bool _isProgrammaticChange = false;
 
         public MonitoringView()
         {
@@ -28,7 +33,31 @@ namespace Bloghua.AutoClient.Desktop.Views
 
             // 初始化按钮状态
             UpdateButtonsState(false);
+
+           // LoadRoles();
+
+            // 【核心修复】监听 Loaded 事件，每次切回来都刷新数据
+            this.Loaded += MonitoringView_Loaded;
+
         }
+
+        // 每次页面显示时触发
+        private void MonitoringView_Loaded(object sender, RoutedEventArgs e)
+        {
+            // 1. 刷新角色列表
+            LoadRoles();
+
+            // 2. 刷新后，如果当前有选中的人，需要重新设置选中项
+            // 否则刷新 ItemsSource 会导致 SelectedValue 变成 null
+            if (!string.IsNullOrEmpty(_currentSessionKey) && cmbRoles.IsEnabled)
+            {
+                string roleCode = ServiceLocator.Db.GetUserRole(_currentSessionKey);
+                _isProgrammaticChange = true;
+                cmbRoles.SelectedValue = roleCode;
+                _isProgrammaticChange = false;
+            }
+        }
+
 
         private void UpdateButtonsState(bool isRunning)
         {
@@ -131,15 +160,7 @@ namespace Bloghua.AutoClient.Desktop.Views
             });
         }
 
-        // 1. 处理标题更新
-        private void OnChatTargetChanged(string title)
-        {
-            Dispatcher.Invoke(() =>
-            {
-                // 如果标题为空或者未识别，显示"未知"
-                lblCurrentChat.Text = string.IsNullOrEmpty(title) ? "未检测到活动窗口" : title;
-            });
-        }
+  
 
         // 2. 处理 AI 建议 (JSON 解析)
         private void OnSuggestionReceived(string rawReply, string originalQuery)
@@ -388,6 +409,61 @@ namespace Bloghua.AutoClient.Desktop.Views
             catch (Exception ex)
             {
                 LogToUI($"复制失败: {ex.Message}");
+            }
+        }
+
+
+        private void LoadRoles()
+        {
+            var roles = ServiceLocator.Db.GetAllRoles();
+            cmbRoles.ItemsSource = roles;
+        }
+
+        // 当检测到聊天对象变化时
+        private void OnChatTargetChanged(string title)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                if (string.IsNullOrEmpty(title) || title.Contains("未检测") || title.Contains("⚠️"))
+                {
+                    lblCurrentChat.Text = title;
+                    cmbRoles.IsEnabled = false;
+                    _currentSessionKey = "";
+                    return;
+                }
+
+                lblCurrentChat.Text = title;
+
+                // 启用下拉框
+                cmbRoles.IsEnabled = true;
+
+                // 构造 SessionKey (注意：这里需要和 Service 里的逻辑一致)
+                // 在辅助模式下，如果是陌生人，Service 用的 BusinessId 是空字符串
+                // 我们尝试从数据库 AuthorizedTarget 找一下是否有 BusinessId
+                var dbUser = ServiceLocator.Db.GetActiveTargets("WeChat").FirstOrDefault(u => title.Contains(u.Name));
+                string bizId = dbUser?.BusinessId ?? "";
+                _currentSessionKey = $"{title}_{bizId}";
+
+                // 从数据库读取该用户的角色配置
+                string roleCode = ServiceLocator.Db.GetUserRole(_currentSessionKey);
+
+                // 选中下拉框 (禁止触发保存事件)
+                _isProgrammaticChange = true;
+                cmbRoles.SelectedValue = roleCode;
+                _isProgrammaticChange = false;
+            });
+        }
+
+        // 用户手动切换下拉框 -> 保存配置
+        private void CmbRoles_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_isProgrammaticChange) return;
+            if (string.IsNullOrEmpty(_currentSessionKey)) return;
+
+            if (cmbRoles.SelectedValue is string newRoleCode)
+            {
+                ServiceLocator.Db.SaveUserRole(_currentSessionKey, newRoleCode);
+                // LogToUI($"已将 [{lblCurrentChat.Text}] 的人设切换为: {cmbRoles.Text}");
             }
         }
     }

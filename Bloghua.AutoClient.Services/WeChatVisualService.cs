@@ -453,7 +453,13 @@ namespace Bloghua.AutoClient.Services
                     LogInfo($"[处理中] 正在请求 API 处理...");
                     _logger.Log($"[DEBUG] 准备调用 API. AppId: ... Session: {user.Name}");
 
-                    replyContent = await _api.GetReplyAsync($"{user.Name}_{user.BusinessId}", msgContent);
+
+                    // 【核心修改】获取该用户绑定的角色
+                    string sessionKey = $"{user.Name}_{user.BusinessId}";
+                    string roleCode = _db.GetUserRole(sessionKey);
+
+                    // 将 roleCode 传给 API
+                    replyContent = await _api.GetReplyAsync(sessionKey, msgContent, roleCode);
 
                     _logger.Log($"[DEBUG] API原始响应: {replyContent}");
 

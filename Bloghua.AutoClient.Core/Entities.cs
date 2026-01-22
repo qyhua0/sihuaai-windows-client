@@ -50,4 +50,22 @@ namespace Bloghua.AutoClient.Core.Entities
         public int Priority { get; set; } = 0; // 优先级，数字越大越优先
         public string Platform { get; set; }   // 平台
     }
+
+
+    // 1. 角色缓存表 (存储从服务端拉取的角色)
+    public class AiRole
+    {
+        [PrimaryKey]
+        public string Code { get; set; } // tech_expert
+        public string Name { get; set; } // 技术专家
+        public bool IsDefault { get; set; }
+    }
+
+    // 2. 用户角色配置表 (记录哪个微信好友用哪个角色)
+    public class UserRoleConfig
+    {
+        [PrimaryKey]
+        public string SessionKey { get; set; } // 微信昵称_业务ID
+        public string RoleCode { get; set; }   // 绑定的角色Code
+    }
 }

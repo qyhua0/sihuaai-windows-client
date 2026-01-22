@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq; // Needed for ToList()
 using Bloghua.AutoClient.Core.Entities;
+using Bloghua.AutoClient.Core.Models;
 using SQLite;
 
 namespace Bloghua.AutoClient.Infrastructure.Data
@@ -22,6 +23,8 @@ namespace Bloghua.AutoClient.Infrastructure.Data
             _db.CreateTable<ChatLog>();
             _db.CreateTable<QuestionAnswer>();
 
+            _db.CreateTable<AiRole>();
+            _db.CreateTable<UserRoleConfig>();
 
             // 初始化默认配置
             InitDefaults();
@@ -180,6 +183,68 @@ namespace Bloghua.AutoClient.Infrastructure.Data
             }
 
             return null;
+        }
+
+
+
+
+        // --- 角色相关 ---
+
+        // 保存拉取到的角色列表
+        public void SaveRoles(List<PromptItem> roles)
+        {
+            _db.RunInTransaction(() =>
+            {
+                _db.DeleteAll<AiRole>(); // 先清空旧的
+                foreach (var r in roles)
+                {
+                    _db.Insert(new AiRole { Code = r.code, Name = r.name, IsDefault = r.is_default });
+                }
+            });
+        }
+
+        // 获取所有角色 (供下拉框使用)
+        public List<AiRole> GetAllRoles()
+        {
+            return _db.Table<AiRole>().ToList();
+        }
+
+        // 获取默认角色 Code
+        public string GetDefaultRoleCode()
+        {
+            var def = _db.Table<AiRole>().FirstOrDefault(r => r.IsDefault);
+            return def?.Code ?? "";
+        }
+
+        // --- 用户配置相关 ---
+
+        // 保存用户与角色的绑定
+        public void SaveUserRole(string sessionKey, string roleCode)
+        {
+            var config = new UserRoleConfig { SessionKey = sessionKey, RoleCode = roleCode };
+            _db.InsertOrReplace(config);
+        }
+
+
+        // 获取某个用户绑定的角色
+        public string GetUserRole(string sessionKey)
+        {
+            // 1. 尝试获取针对该用户的特定配置
+            var config = _db.Find<UserRoleConfig>(sessionKey);
+            if (config != null && !string.IsNullOrEmpty(config.RoleCode))
+            {
+                return config.RoleCode;
+            }
+
+            // 2. 【新增】尝试获取系统设置的"全局默认角色"
+            string globalDefault = GetSetting("GlobalDefaultRole", "");
+            if (!string.IsNullOrEmpty(globalDefault))
+            {
+                return globalDefault;
+            }
+
+            // 3. 最后兜底：获取 API 返回的 is_default=true 的角色
+            return GetDefaultRoleCode();
         }
 
     }

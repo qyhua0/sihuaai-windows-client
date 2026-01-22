@@ -167,7 +167,7 @@
       <DependentUpon>AboutView.xaml</DependentUpon>
     </Compile>
     <Compile Include="Bloghua.AutoClient.Infrastructure\BitmapFilter.cs" />
-    <Compile Include="Bloghua.AutoClient.Infrastructure\DatabaseService.cs" />
+    <Compile Include="Bloghua.AutoClient.Infrastructure\Data\DatabaseService.cs" />
     <Compile Include="Bloghua.AutoClient.Infrastructure\Services\FileLoggerService.cs" />
     <Compile Include="Bloghua.AutoClient.Infrastructure\HttpOcrService.cs" />
     <Compile Include="Bloghua.AutoClient.Infrastructure\OpenCvLocator.cs" />

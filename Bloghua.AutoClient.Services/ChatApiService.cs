@@ -71,9 +71,8 @@ namespace Bloghua.AutoClient.Services
         /// <summary>
         /// 对外公开的调用方法 (保持签名不变)
         /// </summary>
-        public async Task<string> GetReplyAsync(string sessionKey, string content, bool isImage = false)
+        public async Task<string> GetReplyAsync(string sessionKey, string content, string promptCode = null)
         {
-            if (isImage) return "[图片暂不支持]"; // 新API暂时未提及图片处理
 
             try
             {
@@ -97,7 +96,9 @@ namespace Bloghua.AutoClient.Services
                 var businessData = new ChatDataPayload
                 {
                     content = content,
-                    session_key = sessionKey
+                    session_key = sessionKey,
+                    prompt_code = promptCode // 【新增】传入角色
+
                 };
                 string jsonBusiness = JsonConvert.SerializeObject(businessData);
                 string encryptedData = SecurityHelper.AesEncrypt(jsonBusiness, aesKey, aesIv);
@@ -256,5 +257,68 @@ namespace Bloghua.AutoClient.Services
                 return ApiStatus.Unreachable;
             }
         }
+
+
+        /// <summary>
+        /// 【新增】拉取角色列表
+        /// </summary>
+        public async Task<List<PromptItem>> GetPromptsAsync()
+        {
+            var db = ServiceLocator.Db;
+            string baseUrl = db.GetSetting("ApiBaseUrl", "");
+            string appId = db.GetSetting("AppId", "");
+            string appSecret = db.GetSetting("AppSecret", "");
+            string aesKey = db.GetSetting("AesKey", "");
+            string aesIv = db.GetSetting("AesIv", "");
+
+            await EnsureTokenAsync(baseUrl, db);
+
+            // 1. 业务数据 (空对象 {})
+            string encryptedData = SecurityHelper.AesEncrypt("{}", aesKey, aesIv);
+
+            // 2. 信封
+            long timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            string nonce = Guid.NewGuid().ToString("N");
+
+            var envelopeParams = new Dictionary<string, string>
+            {
+                { "app_id", appId },
+                { "time", timestamp.ToString() },
+                { "data", encryptedData },
+                { "ret", nonce }
+            };
+            string sign = SecurityHelper.GenerateSign(envelopeParams, appSecret);
+
+            var requestBody = new ApiEnvelopeRequest
+            {
+                app_id = appId,
+                time = timestamp,
+                data = encryptedData,
+                ret = nonce,
+                sign = sign
+            };
+
+            // 3. 请求
+            var content = new StringContent(JsonConvert.SerializeObject(requestBody), Encoding.UTF8, "application/json");
+            _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _accessToken);
+
+            var response = await _httpClient.PostAsync($"{baseUrl}/prompts", content);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var resStr = await response.Content.ReadAsStringAsync();
+                var apiRes = JsonConvert.DeserializeObject<ApiEnvelopeResponse>(resStr);
+
+                if (apiRes.code == 200 && apiRes.payload != null)
+                {
+                    string decryptedJson = SecurityHelper.AesDecrypt(apiRes.payload.data, aesKey, aesIv);
+                    var payload = JsonConvert.DeserializeObject<PromptListPayload>(decryptedJson);
+                    return payload?.prompts ?? new List<PromptItem>();
+                }
+            }
+            return new List<PromptItem>();
+        }
+
+
     }
 }
