@@ -110,36 +110,47 @@
 
 
 
-            <!-- ============================================== -->
-            <!-- 6. 【新增】AI 人设配置 -->
+            <!-- 6. AI 人设配置 -->
             <!-- ============================================== -->
             <TextBlock Text="AI 人设配置" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,10"/>
             <Border Background="#F9F9F9" Padding="15" CornerRadius="8" Margin="0,0,0,20">
-                <StackPanel>
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="10"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <!-- 左侧：下拉框 -->
+                        <ColumnDefinition Width="20"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <!-- 右侧：按钮组 -->
+                    </Grid.ColumnDefinitions>
 
-                        <!-- 默认角色下拉框 -->
-                        <StackPanel Grid.Column="0">
-                            <TextBlock Text="全局默认人设 (新对话将自动使用此角色)" FontWeight="Bold" Margin="0,0,0,5"/>
-                            <ComboBox x:Name="cmbGlobalRole" 
-                                      HorizontalAlignment="Stretch"
-                                      DisplayMemberPath="Name" 
-                                      SelectedValuePath="Code"
-                                      />
-                        </StackPanel>
+                    <!-- 左侧：默认角色下拉框 -->
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="全局默认人设 (新对话将自动使用此角色)" FontWeight="Bold" Margin="0,0,0,5"/>
+                        <ComboBox x:Name="cmbGlobalRole" 
+                                  HorizontalAlignment="Stretch"
+                                  DisplayMemberPath="Name" 
+                                  SelectedValuePath="Code"
+                                  ui:ControlHelper.PlaceholderText="请选择默认角色..."/>
+                    </StackPanel>
 
-                        <!-- 同步按钮 (搬到这里更合理) -->
-                        <Button Grid.Column="2" Content="同步角色列表 (Sync)" Click="SyncRoles_Click" VerticalAlignment="Bottom" Width="140"/>
-                    </Grid>
+                    <!-- 右侧：同步按钮与状态 -->
+                    <!-- 使用 StackPanel 确保文字和按钮在一起 -->
+                    <StackPanel Grid.Column="2" VerticalAlignment="Bottom" Orientation="Horizontal">
+                        <!-- 状态文字 -->
+                        <TextBlock x:Name="lblSyncStatus" 
+                                   Text="" 
+                                   VerticalAlignment="Center" 
+                                   Margin="0,0,10,0" 
+                                   FontSize="12"/>
 
-                    <TextBlock x:Name="lblSyncStatus" Text="" Foreground="Gray" Margin="0,5,0,0" FontSize="12"/>
-                </StackPanel>
+                        <!-- 按钮 -->
+                        <Button Content="同步角色列表 (Sync)" 
+                                Click="SyncRoles_Click" 
+                                Width="140"/>
+                    </StackPanel>
+                </Grid>
             </Border>
+            
             
 
             <!-- 保存按钮 -->

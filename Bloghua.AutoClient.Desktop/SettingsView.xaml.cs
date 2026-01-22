@@ -127,6 +127,7 @@ namespace Bloghua.AutoClient.Desktop.Views
                 db.SaveSetting("GlobalDefaultRole", cmbGlobalRole.SelectedValue.ToString());
             }
 
+            ServiceLocator.NotifyUserInfoUpdated();
 
             MessageBox.Show("配置已保存。");
         }
@@ -192,6 +193,9 @@ namespace Bloghua.AutoClient.Desktop.Views
             {
                 lblTestResult.Text = "✔ 测试通过";
                 lblTestResult.Foreground = Brushes.Green;
+
+                ServiceLocator.Db.SaveSetting("ApiUser", user);
+                ServiceLocator.NotifyUserInfoUpdated();
             }
             else
             {
@@ -206,8 +210,8 @@ namespace Bloghua.AutoClient.Desktop.Views
             // 先保存当前配置，确保 API 能读取到最新的 Key
             SaveSettings_Click(null, null);
 
-            lblTestResult.Text = "正在拉取角色...";
-            lblTestResult.Foreground = System.Windows.Media.Brushes.Gray;
+            lblSyncStatus.Text = "正在连接云端...";
+            lblSyncStatus.Foreground = Brushes.Gray;
 
             try
             {
@@ -221,8 +225,8 @@ namespace Bloghua.AutoClient.Desktop.Views
                     // 刷新下拉框数据源
                     cmbGlobalRole.ItemsSource = ServiceLocator.Db.GetAllRoles();
 
-                    lblTestResult.Text = $"✔ 成功同步 {roles.Count} 个角色";
-                    lblTestResult.Foreground = System.Windows.Media.Brushes.Green;
+                    lblSyncStatus.Text = $"✔ 同步成功 ({roles.Count})";
+                    lblSyncStatus.Foreground = Brushes.Green;
                 }
                 else
                 {

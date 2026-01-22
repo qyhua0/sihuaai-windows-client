@@ -33,7 +33,13 @@ namespace Bloghua.AutoClient.Desktop
                 // 默认选中第一个菜单项
                 NavView.SelectedItem = NavView.MenuItems[0];
 
-          
+                // 【新增】订阅用户信息更新事件
+                ServiceLocator.OnUserInfoUpdated += UpdateAppTitle;
+
+                // 【新增】初始化时立即更新一次标题
+                UpdateAppTitle();
+
+
             }
             catch (Exception ex)
             {
@@ -54,6 +60,26 @@ namespace Bloghua.AutoClient.Desktop
             {
                 MessageBox.Show($"初始化失败: {ex.Message}");
             }
+        }
+
+        private void UpdateAppTitle()
+        {
+            // 必须在 UI 线程执行
+            Dispatcher.Invoke(() =>
+            {
+                string username = ServiceLocator.Db.GetSetting("ApiUser", "");
+
+                if (!string.IsNullOrEmpty(username))
+                {
+                    this.Title = $"AI 客服助手 - [ {username} ]";
+                }
+                else
+                {
+                    // this.Title = "AI 客服助手 - [ 未登录 ]";
+                    this.Title = "AI 客服助手";
+
+                }
+            });
         }
 
         // 设置主窗口位置：屏幕右下角
@@ -124,6 +150,9 @@ namespace Bloghua.AutoClient.Desktop
                 {
                     case "Monitoring":
                         page = new MonitoringView();
+                        break;
+                    case "Practice": // 【新增】
+                        page = new PracticeView();
                         break;
                     case "Logs":
                         page = new LogView();

@@ -1,0 +1,162 @@
+﻿<Page x:Class="Bloghua.AutoClient.Desktop.Views.PracticeView"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+      xmlns:ui="http://schemas.modernwpf.com/2019"
+      mc:Ignorable="d" 
+      d:DesignHeight="700" d:DesignWidth="900"
+      Title="对话演练">
+
+    <Grid Margin="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <!-- 标题 -->
+            <RowDefinition Height="Auto"/>
+            <!-- 角色选择 -->
+            <RowDefinition Height="Auto"/>
+            <!-- 输入区 -->
+            <RowDefinition Height="Auto"/>
+            <!-- 操作按钮 -->
+            <RowDefinition Height="*"/>
+            <!-- 结果展示 -->
+        </Grid.RowDefinitions>
+
+        <!-- 1. 标题 -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,20">
+            <TextBlock Text="对话模拟演练" FontSize="24" FontWeight="SemiBold"/>
+            <TextBlock Text="在此测试不同人设对特定问题的回复效果，不消耗微信实际消息" Foreground="Gray" Margin="0,5,0,0"/>
+        </StackPanel>
+
+        <!-- 2. 角色选择 -->
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,15">
+            <TextBlock Text="扮演角色：" VerticalAlignment="Center" FontWeight="Bold" Margin="0,0,10,0"/>
+
+            <!-- 【修复1】使用 ui:ControlHelper.PlaceholderText -->
+            <ComboBox x:Name="cmbRoles" Width="200" 
+                      DisplayMemberPath="Name" 
+                      SelectedValuePath="Code"
+                      ui:ControlHelper.PlaceholderText="选择测试人设..."/>
+
+            <TextBlock Text="（默认使用全局配置）" VerticalAlignment="Center" Foreground="Gray" Margin="10,0,0,0" FontSize="12"/>
+        </StackPanel>
+
+        <!-- 3. 输入区 -->
+        <Grid Grid.Row="2" Margin="0,0,0,15">
+            <!-- TextBox 的 PlaceholderText 写法也是一样的 -->
+            <TextBox x:Name="txtInput" 
+                     Height="100" 
+                     TextWrapping="Wrap" 
+                     AcceptsReturn="True" 
+                     VerticalScrollBarVisibility="Auto"
+                     ui:ControlHelper.Header="模拟客户提问" 
+                     ui:ControlHelper.PlaceholderText="请输入或粘贴用户的问题，例如：你们发什么快递？"/>
+        </Grid>
+
+        <!-- 4. 按钮 -->
+        <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,0,0,20">
+            <Button x:Name="btnGenerate" Content="生成回复 (Generate)" 
+                    Click="Generate_Click" 
+                    Background="#0078D7" Foreground="White" FontWeight="Bold" 
+                    Width="150" Height="36"/>
+
+            <!-- 【修复2】加上 ui: 前缀，因为 ProgressRing 是 ModernWPF 的控件 -->
+            <ui:ProgressRing x:Name="loadingRing" IsActive="False" Margin="15,0,0,0"/>
+
+            <TextBlock x:Name="lblStatus" Text="" VerticalAlignment="Center" Margin="10,0,0,0" Foreground="Gray"/>
+        </StackPanel>
+
+        <!-- 5. 结果展示 -->
+        <Border Grid.Row="4" Background="#F9F9F9" CornerRadius="8" Padding="15">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <!-- 结果区标题栏 -->
+                <Grid Grid.Row="0" Margin="0,0,0,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="AI 回复结果" FontWeight="Bold" Foreground="#555" VerticalAlignment="Center"/>
+                        <!-- 显示人设标签 (如果API返回了) -->
+                        <TextBlock x:Name="lblPersona" Text="" Foreground="#0078D7" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="12"/>
+                    </StackPanel>
+
+                    <!-- 【新增】切换查看模式 -->
+                    <ui:ToggleSwitch x:Name="tsViewMode" 
+                                     Grid.Column="1" 
+                                     OffContent="卡片视图" 
+                                     OnContent="原始 JSON" 
+                                     Toggled="ViewMode_Toggled"/>
+                </Grid>
+
+                <!-- 视图 A：渲染后的卡片列表 -->
+                <ScrollViewer x:Name="viewRendered" Grid.Row="1" VerticalScrollBarVisibility="Auto" Visibility="Visible">
+                    <ItemsControl x:Name="listResults">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Margin="0,0,0,10" BorderBrush="#E0E0E0" BorderThickness="1" CornerRadius="4" Background="White">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <!-- 内容区域 -->
+                                        <Grid Grid.Column="0" Margin="12">
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="*"/>
+                                            </Grid.RowDefinitions>
+                                            <!-- 【修改】绑定 DisplayTitle 和 ColorCode -->
+                                            <Border Grid.Row="0" HorizontalAlignment="Left" CornerRadius="4" 
+                                                    Background="{Binding ColorCode}" Padding="8,2" Margin="0,0,0,8">
+                                                <TextBlock Text="{Binding DisplayTitle}" Foreground="White" FontSize="11" FontWeight="Bold"/>
+                                            </Border>
+                                            <!-- 文字 -->
+                                            <TextBox Grid.Row="1" Text="{Binding content}" 
+                                                     IsReadOnly="True" BorderThickness="0" 
+                                                     TextWrapping="Wrap" FontSize="14" />
+                                        </Grid>
+
+                                        <!-- 复制按钮 -->
+                                        <Button Grid.Column="1" Width="50" VerticalAlignment="Stretch"
+                                                Background="#F5F5F5" BorderThickness="1,0,0,0" BorderBrush="#F0F0F0"
+                                                Click="Copy_Click" Tag="{Binding content}"
+                                                ToolTip="复制内容">
+                                            <StackPanel>
+                                                <ui:SymbolIcon Symbol="Copy"/>
+                                                <TextBlock Text="复制" FontSize="10" Margin="0,2,0,0"/>
+                                            </StackPanel>
+                                        </Button>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+
+                <!-- 视图 B：原始 JSON -->
+                <TextBox x:Name="viewRaw" Grid.Row="1" 
+                         Visibility="Collapsed"
+                         IsReadOnly="True" 
+                         TextWrapping="Wrap" 
+                         AcceptsReturn="True" 
+                         FontFamily="Consolas"
+                         VerticalScrollBarVisibility="Auto"/>
+
+                <!-- 空状态提示 -->
+                <TextBlock x:Name="lblEmpty" Grid.Row="1" Text="暂无结果，请先输入问题并生成。" 
+                           VerticalAlignment="Center" HorizontalAlignment="Center" 
+                           Foreground="LightGray" FontSize="16"/>
+            </Grid>
+        </Border>
+        
+        
+    </Grid>
+</Page>

@@ -21,6 +21,10 @@
             <ui:NavigationView.MenuItems>
                 <!-- 这里不需要额外的列表容器，直接放 Item 即可 -->
                 <ui:NavigationViewItem Content="运行监控" Icon="Play" Tag="Monitoring"/>
+
+                <!-- 【新增】对话演练 -->
+                <ui:NavigationViewItem Content="对话演练" Icon="Message" Tag="Practice"/>
+                
                 <ui:NavigationViewItem Content="会话记录" Icon="Comment" Tag="Logs"/>
                 <ui:NavigationViewItem Content="问答管理" Icon="Help" Tag="QA"/>
                 <ui:NavigationViewItem Content="系统设置" Icon="Setting" Tag="Settings"/>

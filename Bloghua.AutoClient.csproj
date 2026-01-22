@@ -166,6 +166,9 @@
     <Compile Include="Bloghua.AutoClient.Desktop\Views\AboutView.xaml.cs">
       <DependentUpon>AboutView.xaml</DependentUpon>
     </Compile>
+    <Compile Include="Bloghua.AutoClient.Desktop\Views\PracticeView.xaml.cs">
+      <DependentUpon>PracticeView.xaml</DependentUpon>
+    </Compile>
     <Compile Include="Bloghua.AutoClient.Infrastructure\BitmapFilter.cs" />
     <Compile Include="Bloghua.AutoClient.Infrastructure\Data\DatabaseService.cs" />
     <Compile Include="Bloghua.AutoClient.Infrastructure\Services\FileLoggerService.cs" />
@@ -200,6 +203,10 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
+    <Page Include="Bloghua.AutoClient.Desktop\Views\PracticeView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Properties\AssemblyInfo.cs">
@@ -221,6 +228,7 @@
     </EmbeddedResource>
     <None Include="config\config.json" />
     <None Include="doc\开发文档.md" />
+    <None Include="doc\斯华AI-客户端操作手册.md" />
     <None Include="packages.config" />
     <None Include="Properties\Settings.settings">
       <Generator>SettingsSingleFileGenerator</Generator>
