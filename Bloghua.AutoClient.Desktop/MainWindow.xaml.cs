@@ -13,12 +13,17 @@ using Bloghua.AutoClient.Infrastructure.Services;
 using Bloghua.AutoClient.Services;
 using Bloghua.AutoClient.Core.Interfaces;
 
+// 引入 Forms 和 Drawing 命名空间，为了避免冲突，使用别名
+using WinForms = System.Windows.Forms;
+using Drawing = System.Drawing;
+
 namespace Bloghua.AutoClient.Desktop
 {
     public partial class MainWindow : Window
     {
         // 页面缓存：显式指定 System.Windows.Controls.Page
         private Dictionary<string, System.Windows.Controls.Page> _pageCache = new Dictionary<string, System.Windows.Controls.Page>();
+        private WinForms.NotifyIcon _notifyIcon;
 
         public MainWindow()
         {
@@ -60,6 +65,9 @@ namespace Bloghua.AutoClient.Desktop
             {
                 MessageBox.Show($"初始化失败: {ex.Message}");
             }
+
+            // 【新增】初始化托盘图标
+            InitSystemTray();
         }
 
         private void UpdateAppTitle()
@@ -180,5 +188,87 @@ namespace Bloghua.AutoClient.Desktop
                 ContentFrame.Navigate(page);
             }
         }
+
+
+
+
+        private void InitSystemTray()
+        {
+            _notifyIcon = new WinForms.NotifyIcon();
+
+            // 尝试获取当前程序的图标作为托盘图标
+            try
+            {
+                string exePath = System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName;
+                _notifyIcon.Icon = Drawing.Icon.ExtractAssociatedIcon(exePath);
+            }
+            catch
+            {
+                // 如果获取失败，使用系统默认图标兜底
+                _notifyIcon.Icon = Drawing.SystemIcons.Application;
+            }
+
+            _notifyIcon.Text = "斯华AI客服助手";
+            _notifyIcon.Visible = true;
+
+            // 双击托盘图标 -> 恢复窗口
+            _notifyIcon.DoubleClick += (s, e) => ShowWindow();
+
+            // 右键菜单
+            var contextMenu = new WinForms.ContextMenuStrip();
+            contextMenu.Items.Add("显示主界面", null, (s, e) => ShowWindow());
+            contextMenu.Items.Add("-"); // 分割线
+            contextMenu.Items.Add("退出程序", null, (s, e) => ExitApplication());
+
+            _notifyIcon.ContextMenuStrip = contextMenu;
+        }
+
+        // 窗口状态改变事件 (最小化时隐藏)
+        protected override void OnStateChanged(EventArgs e)
+        {
+            if (this.WindowState == WindowState.Minimized)
+            {
+                this.Hide(); // 隐藏任务栏图标
+
+                // 可选：弹个气泡提示
+                // _notifyIcon.ShowBalloonTip(2000, "提示", "程序已最小化到托盘", WinForms.ToolTipIcon.Info);
+            }
+            base.OnStateChanged(e);
+        }
+
+        // 窗口关闭事件 (拦截关闭按钮，改为最小化)
+        // 如果您希望点 X 是彻底退出，可以去掉这个重写方法
+        // 如果您希望点 X 是最小化到托盘，请保留
+        protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
+        {
+            // 这里的逻辑是：点击关闭按钮 -> 最小化到托盘
+            // 只有通过托盘菜单的"退出"或者代码显式 Shutdown 才能真退出
+            e.Cancel = true;
+            this.WindowState = WindowState.Minimized;
+        }
+
+        private void ShowWindow()
+        {
+            this.Show(); // 显示窗口
+            this.WindowState = WindowState.Normal; // 恢复大小
+            this.Activate(); // 激活焦点
+        }
+
+        private void ExitApplication()
+        {
+            // 1. 销毁托盘图标 (否则退出后托盘里会有个残影)
+            if (_notifyIcon != null)
+            {
+                _notifyIcon.Visible = false;
+                _notifyIcon.Dispose();
+                _notifyIcon = null;
+            }
+
+            
+
+            // 3. 强制退出
+            Application.Current.Shutdown();
+        }
+
     }
 }

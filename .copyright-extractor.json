@@ -1,0 +1,16 @@
+{
+  "include_extensions": [".cs", ".xaml"],
+  "exclude_dirs": [
+    "bin",
+    "obj",
+    ".vs",
+    "packages",
+    ".git"
+  ],
+  "exclude_files": [
+    "*Designer.cs",
+    "*.g.cs",
+    "*AssemblyInfo.cs"
+  ],
+  "output": "WPF_SourceCode.docx"
+}
