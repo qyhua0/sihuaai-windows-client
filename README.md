@@ -3,15 +3,14 @@
 面向微信与桌面客服场景的 AI 智能辅助客户端。  
 通过 **截图识别（OCR）+ 上下文整理 + 智能回复建议**，帮助客服团队在不改变原有工作习惯的前提下，快速获得高质量回复建议，提升响应效率与转化率。
 
-> 官网：[斯华AI官网](https://www.sihuaai.com/?utm_source=chatgpt.com)  
-> 产品主页：:contentReference[oaicite:1]{index=1}  
-> 在线体验：[访问官网](https://www.sihuaai.com/?utm_source=chatgpt.com)
+> 官网：[斯华AI官网](https://www.sihuaai.com)  
+
 
 ---
 
 ## 项目简介
 
-斯华AI · 客服助手（Windows Client）是 :contentReference[oaicite:3]{index=3} 的桌面辅助客户端，专为客服、销售、私域运营等高频对话场景设计。
+斯华AI · 客服助手（Windows Client）是桌面辅助客户端，专为客服、销售、私域运营等高频对话场景设计。
 
 它并不替代现有聊天工具，而是作为一个轻量级桌面辅助终端运行在本地：
 
@@ -76,7 +75,7 @@
 - 上下文整理
 - 快捷交互
 
-不存储敏感业务数据，支持企业私有化部署。:contentReference[oaicite:4]{index=4}
+不存储敏感业务数据，支持企业私有化部署。
 
 ---
 
@@ -168,7 +167,7 @@
 * SaaS 控制台
 * 企业级安全部署
 
-请访问官网：[预约私有化演示](https://www.sihuaai.com/?utm_source=chatgpt.com)
+请访问官网：[预约私有化演示](https://www.sihuaai.com)
 
 ---
 
